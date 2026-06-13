@@ -3,8 +3,11 @@ import UniformTypeIdentifiers
 
 struct ContentView: View {
     @EnvironmentObject private var store: FolderStore
+    @EnvironmentObject private var language: AppLanguage
     @Environment(\.scenePhase) private var scenePhase
     @State private var showingImporter = false
+
+    private var s: Strings { language.s }
 
     var body: some View {
         NavigationStack {
@@ -17,6 +20,9 @@ struct ContentView: View {
             }
             .navigationTitle("Erik's Day")
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    LanguageToggle()
+                }
                 if store.hasFolder {
                     ToolbarItem(placement: .topBarTrailing) {
                         Button {
@@ -27,6 +33,8 @@ struct ContentView: View {
                     }
                 }
             }
+            // 24-hour clock always; month names/date order follow the language.
+            .environment(\.locale, language.current.locale)
         }
         .fileImporter(isPresented: $showingImporter, allowedContentTypes: [.folder]) { result in
             switch result {
@@ -39,10 +47,10 @@ struct ContentView: View {
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { store.reload() }
         }
-        .alert("Something went wrong",
+        .alert(s.errorTitle,
                isPresented: Binding(get: { store.lastError != nil },
                                     set: { if !$0 { store.lastError = nil } })) {
-            Button("OK", role: .cancel) { }
+            Button(s.ok, role: .cancel) { }
         } message: {
             Text(store.lastError ?? "")
         }
@@ -50,12 +58,41 @@ struct ContentView: View {
 
     private var folderPrompt: some View {
         ContentUnavailableView {
-            Label("Choose your shared folder", systemImage: "folder.badge.person.crop")
+            Label(s.chooseFolderTitle, systemImage: "folder.badge.person.crop")
         } description: {
-            Text("Pick the iCloud Drive folder you shared with family. Everyone selects the same folder on their own device.")
+            Text(s.chooseFolderBody)
         } actions: {
-            Button("Choose Folder") { showingImporter = true }
+            Button(s.chooseFolderButton) { showingImporter = true }
                 .buttonStyle(.borderedProminent)
+        }
+    }
+}
+
+/// A pair of flag buttons in the top bar; the active language is highlighted.
+private struct LanguageToggle: View {
+    @EnvironmentObject private var language: AppLanguage
+
+    var body: some View {
+        HStack(spacing: 2) {
+            ForEach(Language.allCases) { lang in
+                Button {
+                    language.current = lang
+                } label: {
+                    Text(lang.flag)
+                        .font(.title3)
+                        .opacity(language.current == lang ? 1 : 0.35)
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 2)
+                        .background {
+                            if language.current == lang {
+                                RoundedRectangle(cornerRadius: 6)
+                                    .fill(.quaternary)
+                            }
+                        }
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(lang.accessibilityName)
+            }
         }
     }
 }

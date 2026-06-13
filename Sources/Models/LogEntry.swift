@@ -4,18 +4,6 @@ enum LogKind: String, Codable, CaseIterable, Identifiable {
     case sleep, wake, nap, meal, urine, stool, note
     var id: String { rawValue }
 
-    var label: String {
-        switch self {
-        case .sleep: "Sleep"
-        case .wake:  "Wake"
-        case .nap:   "Nap"
-        case .meal:  "Meal"
-        case .urine: "Pee"
-        case .stool: "Poop"
-        case .note:  "Note"
-        }
-    }
-
     var symbol: String {
         switch self {
         case .sleep: "moon.fill"
@@ -27,15 +15,16 @@ enum LogKind: String, Codable, CaseIterable, Identifiable {
         case .note:  "note.text"
         }
     }
+
+    /// Sleep and naps have a start and an (optional, open-ended) end.
+    var hasDuration: Bool { self == .sleep || self == .nap }
+
+    /// Meals record how much was eaten.
+    var hasAmount: Bool { self == .meal }
 }
 
 enum Amount: String, Codable, CaseIterable, Identifiable {
-    case little, some, normal, lots
-    var id: String { rawValue }
-}
-
-enum SleepQuality: String, Codable, CaseIterable, Identifiable {
-    case poor, fair, good
+    case little, medium, lots
     var id: String { rawValue }
 }
 
@@ -46,21 +35,21 @@ struct LogEntry: Codable, Identifiable, Hashable {
     var timestamp: Date
     var kind: LogKind
     var amount: Amount?
-    var quality: SleepQuality?
+    /// Open-ended while nil (e.g. just noting that he went to sleep).
     var endTimestamp: Date?
+    /// Freetext: for sleep this is where quality/how-he-settled goes; for a
+    /// meal it's what he ate.
     var note: String
 
     init(kind: LogKind,
          timestamp: Date = .now,
          amount: Amount? = nil,
-         quality: SleepQuality? = nil,
          endTimestamp: Date? = nil,
          note: String = "") {
         self.id = UUID()
         self.timestamp = timestamp
         self.kind = kind
         self.amount = amount
-        self.quality = quality
         self.endTimestamp = endTimestamp
         self.note = note
     }

@@ -33,11 +33,12 @@ from their own devices.
 
 ```
 Sources/
-  EriksDayApp.swift        app entry, injects FolderStore
-  Models/LogEntry.swift    Codable structs + enums (LogKind, Amount, SleepQuality)
+  EriksDayApp.swift        app entry, injects FolderStore + AppLanguage
+  Models/LogEntry.swift    Codable structs + enums (LogKind, Amount)
   Storage/FolderStore.swift  bookmark mgmt + coordinated file-per-entry I/O
-  Views/ContentView.swift  router (folder picker vs log) + importer + alert
-  Views/LogView.swift      one-tap buttons + today's timeline
+  Localization/Localization.swift  Language + AppLanguage + Strings table
+  Views/ContentView.swift  router (folder picker vs log) + importer + alert + flag toggle
+  Views/LogView.swift      one-tap buttons + today's timeline + entry editor
 project.yml                XcodeGen spec
 ```
 

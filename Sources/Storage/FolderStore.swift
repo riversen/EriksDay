@@ -71,7 +71,13 @@ final class FolderStore: ObservableObject {
         try FileManager.default.createDirectory(at: entriesURL, withIntermediateDirectories: true)
     }
 
-    func add(_ entry: LogEntry) {
+    func add(_ entry: LogEntry) { save(entry) }
+
+    /// Persist an edited entry. The file is keyed by `id`, so this overwrites
+    /// the existing JSON in place.
+    func update(_ entry: LogEntry) { save(entry) }
+
+    private func save(_ entry: LogEntry) {
         guard let folderURL, let entriesURL else {
             lastError = "No folder selected yet."
             return
