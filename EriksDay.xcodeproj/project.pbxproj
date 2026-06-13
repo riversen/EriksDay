@@ -1,0 +1,335 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		4DA0E3C540D2380728238FA7 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D600FB42D4F1B67006D4F46B /* ContentView.swift */; };
+		A785DBAC8ECDF659A2574755 /* LogEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6F0C293656702B9A3969B53 /* LogEntry.swift */; };
+		B5B992CAA4F7EBE9C96E5D00 /* LogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82E79720AF4B318C3C3C9C0E /* LogView.swift */; };
+		D9FD62B72EEFD457D16EB2BB /* EriksDayApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E8DB129C97646BA0D00E358 /* EriksDayApp.swift */; };
+		E00D31E3B2F7A1D82FABD4B2 /* FolderStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB0E7D29CBDF344D6BC6D185 /* FolderStore.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		82E79720AF4B318C3C3C9C0E /* LogView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogView.swift; sourceTree = "<group>"; };
+		9E8DB129C97646BA0D00E358 /* EriksDayApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EriksDayApp.swift; sourceTree = "<group>"; };
+		AB0E7D29CBDF344D6BC6D185 /* FolderStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FolderStore.swift; sourceTree = "<group>"; };
+		C1F5E9212DC2DD26790379FF /* EriksDay.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = EriksDay.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		C6F0C293656702B9A3969B53 /* LogEntry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogEntry.swift; sourceTree = "<group>"; };
+		D600FB42D4F1B67006D4F46B /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		12AFDF41E01D6C9B0152F010 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				C6F0C293656702B9A3969B53 /* LogEntry.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		52ED969FDCB22EA9CC32E99C /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				9E8DB129C97646BA0D00E358 /* EriksDayApp.swift */,
+				12AFDF41E01D6C9B0152F010 /* Models */,
+				6DDD906EBEDF35AC3F4E7668 /* Storage */,
+				5FFA663915BB8BF31E86CFED /* Views */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+		5FFA663915BB8BF31E86CFED /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				D600FB42D4F1B67006D4F46B /* ContentView.swift */,
+				82E79720AF4B318C3C3C9C0E /* LogView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		6DDD906EBEDF35AC3F4E7668 /* Storage */ = {
+			isa = PBXGroup;
+			children = (
+				AB0E7D29CBDF344D6BC6D185 /* FolderStore.swift */,
+			);
+			path = Storage;
+			sourceTree = "<group>";
+		};
+		A344AF6A11C66EF84BF1108D /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				C1F5E9212DC2DD26790379FF /* EriksDay.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		D851AEBDFFD5A844B8ECE914 = {
+			isa = PBXGroup;
+			children = (
+				52ED969FDCB22EA9CC32E99C /* Sources */,
+				A344AF6A11C66EF84BF1108D /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		EA32FA7B85992C3B3AC0FD01 /* EriksDay */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 8D0D58D2B6389CF34EA28067 /* Build configuration list for PBXNativeTarget "EriksDay" */;
+			buildPhases = (
+				7A244E0F4DC8FC4713CCEAE7 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = EriksDay;
+			packageProductDependencies = (
+			);
+			productName = EriksDay;
+			productReference = C1F5E9212DC2DD26790379FF /* EriksDay.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		9AD603D9BE577F44F845D7EF /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					EA32FA7B85992C3B3AC0FD01 = {
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = 4FB0778EF356395A9C73D894 /* Build configuration list for PBXProject "EriksDay" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = D851AEBDFFD5A844B8ECE914;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = A344AF6A11C66EF84BF1108D /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				EA32FA7B85992C3B3AC0FD01 /* EriksDay */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		7A244E0F4DC8FC4713CCEAE7 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				4DA0E3C540D2380728238FA7 /* ContentView.swift in Sources */,
+				D9FD62B72EEFD457D16EB2BB /* EriksDayApp.swift in Sources */,
+				E00D31E3B2F7A1D82FABD4B2 /* FolderStore.swift in Sources */,
+				A785DBAC8ECDF659A2574755 /* LogEntry.swift in Sources */,
+				B5B992CAA4F7EBE9C96E5D00 /* LogView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		03AD12BCF660CBA1B894A487 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "Erik's Day";
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.example.eriksday;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		75F0FF3FD0F5A23C858AD26B /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "Erik's Day";
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.example.eriksday;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		8D4D120A3C0AC66F561B594E /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		D306CBF9B30A0010E46C4CF5 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		4FB0778EF356395A9C73D894 /* Build configuration list for PBXProject "EriksDay" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D306CBF9B30A0010E46C4CF5 /* Debug */,
+				8D4D120A3C0AC66F561B594E /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		8D0D58D2B6389CF34EA28067 /* Build configuration list for PBXNativeTarget "EriksDay" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				75F0FF3FD0F5A23C858AD26B /* Debug */,
+				03AD12BCF660CBA1B894A487 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 9AD603D9BE577F44F845D7EF /* Project object */;
+}
