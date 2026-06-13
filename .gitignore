@@ -1,0 +1,20 @@
+# macOS
+.DS_Store
+
+# Xcode user state (per-developer, not shared)
+xcuserdata/
+*.xcuserstate
+**/xcshareddata/WorkspaceSettings.xcsettings
+
+# Build output
+build/
+DerivedData/
+*.xcarchive
+
+# Swift Package Manager
+.swiftpm/
+.build/
+
+# CocoaPods / Carthage (unused, but harmless to ignore)
+Pods/
+Carthage/Build/
