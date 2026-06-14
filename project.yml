@@ -1,6 +1,6 @@
 name: EriksDay
 options:
-  bundleIdPrefix: com.example
+  bundleIdPrefix: com.roysworld
   deploymentTarget:
     iOS: "17.0"
   createIntermediateGroups: true
@@ -13,19 +13,26 @@ targets:
       - path: Sources
     settings:
       base:
-        # Change this to your own reverse-DNS id.
-        PRODUCT_BUNDLE_IDENTIFIER: com.example.eriksday
+        PRODUCT_BUNDLE_IDENTIFIER: com.roysworld.eriksday
         INFOPLIST_KEY_CFBundleDisplayName: "Erik's Day"
         MARKETING_VERSION: "1.0"
-        CURRENT_PROJECT_VERSION: "1"
+        CURRENT_PROJECT_VERSION: "2"
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        # Orientations. With GENERATE_INFOPLIST_FILE the device-qualified
+        # key uses the _iPad/_iPhone suffix (Xcode maps it to the plist's
+        # UISupportedInterfaceOrientations~ipad). iPad needs all four to
+        # satisfy multitasking (App Store Connect error 90474).
+        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
+        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
+        # Standard HTTPS only, no proprietary crypto: skip the
+        # export-compliance prompt on every TestFlight build.
+        INFOPLIST_KEY_ITSAppUsesNonExemptEncryption: NO
         SWIFT_VERSION: "5.0"
         # iPhone + iPad
         TARGETED_DEVICE_FAMILY: "1,2"
         CODE_SIGN_STYLE: Automatic
-        # Set this so signing survives `xcodegen generate`.
-        # Find your Team ID in Xcode > Settings > Accounts, or at
-        # developer.apple.com/account (Membership details).
-        # DEVELOPMENT_TEAM: ABCDE12345
+        # Roy Iversen (Personal Team). Set here so signing survives
+        # `xcodegen generate`.
+        DEVELOPMENT_TEAM: GYAAX4JTDW
