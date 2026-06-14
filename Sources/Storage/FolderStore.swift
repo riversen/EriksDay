@@ -90,6 +90,7 @@ final class FolderStore: ObservableObject {
     private func ensureSubfolders() throws {
         let fm = FileManager.default
         if let entriesURL { try fm.createDirectory(at: entriesURL, withIntermediateDirectories: true) }
+        if let routinesURL { try fm.createDirectory(at: routinesURL, withIntermediateDirectories: true) }
         if let mediaURL { try fm.createDirectory(at: mediaURL, withIntermediateDirectories: true) }
     }
 
@@ -182,6 +183,9 @@ final class FolderStore: ObservableObject {
 
     func reloadAll() {
         guard hasFolder else { return }
+        // Folders picked by an earlier build won't have the routines/ subfolder
+        // yet; create any missing subfolders before reading or writing.
+        withFolderAccess { try? ensureSubfolders() }
         migrateLooseEntries()
         refreshKnownWeeks()
         let target = loadedWeeks.union(recentWeekKeys()).intersection(knownWeeks)
@@ -283,6 +287,7 @@ final class FolderStore: ObservableObject {
         var d = doc
         d.edits.append(EditRecord(device: deviceName, date: .now))
         withFolderAccess {
+            try? FileManager.default.createDirectory(at: routinesURL, withIntermediateDirectories: true)
             let mdURL = routinesURL.appendingPathComponent("\(d.id.uuidString).md")
             coordinatedWrite(to: mdURL) { url in
                 try d.body.data(using: .utf8)?.write(to: url, options: .atomic)
