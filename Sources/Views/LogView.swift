@@ -95,14 +95,14 @@ struct LogView: View {
         .onChange(of: selectedDay) { _, day in store.ensureLoaded(weekOf: day) }
         .sheet(item: $editing) { entry in
             NavigationStack {
-                EntryEditor(entry: entry, isNew: false,
+                EntryEditor(entry: entry, isNew: false, uiLanguage: language.current,
                             onSave: store.update,
                             onDelete: { store.delete(entry) })
             }
         }
         .sheet(item: $newEntry) { entry in
             NavigationStack {
-                EntryEditor(entry: entry, isNew: true,
+                EntryEditor(entry: entry, isNew: true, uiLanguage: language.current,
                             onSave: store.add,
                             onDelete: nil)
             }
@@ -203,7 +203,8 @@ private struct EntryRow: View {
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 if !entry.note.isEmpty {
-                    Text(entry.note).font(.caption).foregroundStyle(.secondary).lineLimit(2)
+                    Text(entry.note.resolved(for: language.current))
+                        .font(.caption).foregroundStyle(.secondary).lineLimit(2)
                 }
             }
             Spacer()
@@ -272,12 +273,14 @@ private struct EntryEditor: View {
     @State private var endDate: Date
     @State private var amount: Amount
     @State private var moods: Set<Mood>
+    @State private var noteText: String
 
     let isNew: Bool
+    let uiLanguage: Language
     let onSave: (LogEntry) -> Void
     let onDelete: (() -> Void)?
 
-    init(entry: LogEntry, isNew: Bool,
+    init(entry: LogEntry, isNew: Bool, uiLanguage: Language,
          onSave: @escaping (LogEntry) -> Void,
          onDelete: (() -> Void)?) {
         _entry = State(initialValue: entry)
@@ -285,7 +288,9 @@ private struct EntryEditor: View {
         _endDate = State(initialValue: entry.endTimestamp ?? entry.timestamp)
         _amount = State(initialValue: entry.amount ?? .normal)
         _moods = State(initialValue: Set(entry.moods))
+        _noteText = State(initialValue: entry.note.resolved(for: uiLanguage))
         self.isNew = isNew
+        self.uiLanguage = uiLanguage
         self.onSave = onSave
         self.onDelete = onDelete
     }
@@ -326,7 +331,7 @@ private struct EntryEditor: View {
             }
 
             Section(s.notesOptional) {
-                TextField(notePrompt, text: $entry.note, axis: .vertical)
+                TextField(notePrompt, text: $noteText, axis: .vertical)
                     .lineLimit(1...6)
             }
 
@@ -380,6 +385,10 @@ private struct EntryEditor: View {
         e.endTimestamp = kind.hasDuration && hasEnd ? endDate : nil
         e.amount = kind.hasAmount ? amount : nil
         e.moods = kind.hasMood ? Mood.allCases.filter { moods.contains($0) } : []
+        // Only re-author the note (and invalidate translations) if it changed.
+        if noteText != entry.note.resolved(for: uiLanguage) {
+            e.note = noteText.isEmpty ? LocalizedText() : LocalizedText(noteText, language: uiLanguage)
+        }
         onSave(e)
         dismiss()
     }

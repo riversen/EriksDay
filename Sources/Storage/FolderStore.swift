@@ -296,8 +296,9 @@ final class FolderStore: ObservableObject {
                 try d.body.data(using: .utf8)?.write(to: url, options: .atomic)
             }
             let metaURL = routinesURL.appendingPathComponent("\(d.id.uuidString).json")
+            let meta = RoutineMeta(edits: d.edits, sourceLanguage: d.sourceLanguage, translations: d.translations)
             coordinatedWrite(to: metaURL) { url in
-                try JSONEncoder.eriksDay.encode(RoutineMeta(edits: d.edits)).write(to: url, options: .atomic)
+                try JSONEncoder.eriksDay.encode(meta).write(to: url, options: .atomic)
             }
         }
         reloadRoutines()
@@ -357,9 +358,12 @@ final class FolderStore: ObservableObject {
                     let modified = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?
                         .contentModificationDate ?? .distantPast
                     let metaURL = dir.appendingPathComponent("\(id.uuidString).json")
-                    let edits = (try? Data(contentsOf: metaURL))
-                        .flatMap { try? JSONDecoder.eriksDay.decode(RoutineMeta.self, from: $0) }?.edits ?? []
-                    loaded.append(RoutineDoc(id: id, body: body, updatedAt: modified, edits: edits))
+                    let meta = (try? Data(contentsOf: metaURL))
+                        .flatMap { try? JSONDecoder.eriksDay.decode(RoutineMeta.self, from: $0) }
+                    loaded.append(RoutineDoc(id: id, body: body, updatedAt: modified,
+                                             edits: meta?.edits ?? [],
+                                             sourceLanguage: meta?.sourceLanguage,
+                                             translations: meta?.translations ?? [:]))
                 }
             }
             if let coordError { lastError = coordError.localizedDescription }
@@ -413,12 +417,12 @@ extension FolderStore {
             Calendar.current.date(bySettingHour: h, minute: m, second: 0, of: .now) ?? .now
         }
         add(LogEntry(kind: .wake, timestamp: at(7, 30)))
-        add(LogEntry(kind: .meal, timestamp: at(8, 0), amount: .normal, note: "Oatmeal and banana"))
+        add(LogEntry(kind: .meal, timestamp: at(8, 0), amount: .normal, note: "Oatmeal and banana", noteLanguage: .en))
         add(LogEntry(kind: .urine, timestamp: at(9, 10)))
         add(LogEntry(kind: .mood, timestamp: at(9, 30), moods: [.happy, .energetic]))
         add(LogEntry(kind: .nap, timestamp: at(12, 30), endTimestamp: at(13, 15)))
-        add(LogEntry(kind: .meal, timestamp: at(15, 0), amount: .little, note: "Apple slices"))
-        add(LogEntry(kind: .note, timestamp: at(16, 20), note: "Great afternoon at the park."))
+        add(LogEntry(kind: .meal, timestamp: at(15, 0), amount: .little, note: "Apple slices", noteLanguage: .en))
+        add(LogEntry(kind: .note, timestamp: at(16, 20), note: "Great afternoon at the park.", noteLanguage: .en))
 
         saveRoutine(RoutineDoc(id: UUID(), body: """
         # Sign Language
@@ -429,7 +433,7 @@ extension FolderStore {
         - **All done** — twist hands outward
         - **Eat** — fingertips to mouth
         - **Help** — fist on flat palm, lift up
-        """, updatedAt: .now))
+        """, updatedAt: .now, sourceLanguage: .en))
 
         saveRoutine(RoutineDoc(id: UUID(), body: """
         # Likes
@@ -438,7 +442,7 @@ extension FolderStore {
         - Trampolines
         - The number 7 bus
         - Soft blankets
-        """, updatedAt: .now))
+        """, updatedAt: .now, sourceLanguage: .en))
 
         saveRoutine(RoutineDoc(id: UUID(), body: """
         # Dislikes
@@ -446,7 +450,7 @@ extension FolderStore {
         - Loud hand dryers
         - Sudden changes in plan
         - Scratchy clothing labels
-        """, updatedAt: .now))
+        """, updatedAt: .now, sourceLanguage: .en))
         reloadAll()
     }
 }

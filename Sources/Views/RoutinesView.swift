@@ -62,7 +62,8 @@ struct RoutinesView: View {
     private func createRoutine() {
         let name = newName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty else { return }
-        let doc = RoutineDoc(id: UUID(), body: "# \(name)\n\n", updatedAt: .now)
+        let doc = RoutineDoc(id: UUID(), body: "# \(name)\n\n", updatedAt: .now,
+                             sourceLanguage: language.current)
         store.saveRoutine(doc)
         route = RoutineRoute(id: doc.id, startInEdit: true)
     }
@@ -83,12 +84,18 @@ private struct RoutineDetailView: View {
     private var s: Strings { language.s }
     private var doc: RoutineDoc? { store.routines.first { $0.id == id } }
 
+    private var detailTitle: String {
+        guard let doc else { return s.untitled }
+        let title = doc.resolvedTitle(for: language.current)
+        return title.isEmpty ? s.untitled : title
+    }
+
     var body: some View {
         Group {
             if let doc {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
-                        MarkdownPreview(markdown: doc.body)
+                        MarkdownPreview(markdown: doc.resolvedBody(for: language.current))
                             .frame(maxWidth: .infinity, alignment: .leading)
                         if let last = doc.edits.last {
                             Divider()
@@ -108,7 +115,7 @@ private struct RoutineDetailView: View {
                 ContentUnavailableView(s.untitled, systemImage: "folder")
             }
         }
-        .navigationTitle(doc.map { $0.title.isEmpty ? s.untitled : $0.title } ?? s.untitled)
+        .navigationTitle(detailTitle)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
@@ -116,7 +123,9 @@ private struct RoutineDetailView: View {
             }
         }
         .sheet(isPresented: $showEditor) {
-            if let doc { NavigationStack { RoutineEditorView(doc: doc) } }
+            if let doc {
+                NavigationStack { RoutineEditorView(doc: doc, uiLanguage: language.current) }
+            }
         }
         .onAppear {
             if startInEdit && !didAutoOpen { didAutoOpen = true; showEditor = true }
@@ -134,7 +143,8 @@ private struct RoutineRow: View {
                 .foregroundStyle(.secondary)
                 .frame(width: 26)
             VStack(alignment: .leading, spacing: 2) {
-                Text(doc.title.isEmpty ? language.s.untitled : doc.title)
+                let title = doc.resolvedTitle(for: language.current)
+                Text(title.isEmpty ? language.s.untitled : title)
                 Text(doc.updatedAt, style: .date).font(.caption).foregroundStyle(.secondary)
             }
             Spacer()
@@ -160,11 +170,13 @@ private struct RoutineEditorView: View {
     @State private var linkURLString = ""
 
     private let doc: RoutineDoc
+    private let uiLanguage: Language
     private enum Mode { case edit, preview }
 
-    init(doc: RoutineDoc) {
+    init(doc: RoutineDoc, uiLanguage: Language) {
         self.doc = doc
-        _text = State(initialValue: doc.body)
+        self.uiLanguage = uiLanguage
+        _text = State(initialValue: doc.resolvedBody(for: uiLanguage))
     }
 
     private var s: Strings { language.s }
@@ -269,7 +281,13 @@ private struct RoutineEditorView: View {
 
     private func save() {
         var updated = doc
-        updated.body = text
+        // Editing what you see re-authors the doc in your language and clears
+        // now-stale translations (the offline process regenerates them).
+        if text != doc.resolvedBody(for: uiLanguage) {
+            updated.body = text
+            updated.sourceLanguage = uiLanguage
+            updated.translations = [:]
+        }
         updated.updatedAt = .now
         store.saveRoutine(updated)
         dismiss()

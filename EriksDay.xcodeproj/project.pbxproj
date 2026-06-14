@@ -11,6 +11,7 @@
 		4F2EA0C48A162D23164CFDDE /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 878EA9A832B8A1645C4555E4 /* Assets.xcassets */; };
 		70B7AD8928CEF590B2D9630A /* Localization.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3E5F3C5B8D458D8547F1C90 /* Localization.swift */; };
 		7743AE0864E8AD7F377D0144 /* RoutineDoc.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99C92FC3D5249B87A60709F2 /* RoutineDoc.swift */; };
+		86B963FA18BAC55E65E846D3 /* LocalizedText.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4828E21A692970751D02362B /* LocalizedText.swift */; };
 		A785DBAC8ECDF659A2574755 /* LogEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6F0C293656702B9A3969B53 /* LogEntry.swift */; };
 		B5B992CAA4F7EBE9C96E5D00 /* LogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82E79720AF4B318C3C3C9C0E /* LogView.swift */; };
 		C69A67D198AB884353E51F25 /* RoutinesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91CB50CD20016A1521209076 /* RoutinesView.swift */; };
@@ -19,6 +20,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		4828E21A692970751D02362B /* LocalizedText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalizedText.swift; sourceTree = "<group>"; };
 		82E79720AF4B318C3C3C9C0E /* LogView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogView.swift; sourceTree = "<group>"; };
 		878EA9A832B8A1645C4555E4 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		91CB50CD20016A1521209076 /* RoutinesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoutinesView.swift; sourceTree = "<group>"; };
@@ -35,6 +37,7 @@
 		12AFDF41E01D6C9B0152F010 /* Models */ = {
 			isa = PBXGroup;
 			children = (
+				4828E21A692970751D02362B /* LocalizedText.swift */,
 				C6F0C293656702B9A3969B53 /* LogEntry.swift */,
 				99C92FC3D5249B87A60709F2 /* RoutineDoc.swift */,
 			);
@@ -171,6 +174,7 @@
 				D9FD62B72EEFD457D16EB2BB /* EriksDayApp.swift in Sources */,
 				E00D31E3B2F7A1D82FABD4B2 /* FolderStore.swift in Sources */,
 				70B7AD8928CEF590B2D9630A /* Localization.swift in Sources */,
+				86B963FA18BAC55E65E846D3 /* LocalizedText.swift in Sources */,
 				A785DBAC8ECDF659A2574755 /* LogEntry.swift in Sources */,
 				B5B992CAA4F7EBE9C96E5D00 /* LogView.swift in Sources */,
 				7743AE0864E8AD7F377D0144 /* RoutineDoc.swift in Sources */,

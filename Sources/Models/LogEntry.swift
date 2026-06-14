@@ -64,8 +64,9 @@ struct LogEntry: Codable, Identifiable, Hashable {
     var moods: [Mood]
     /// Open-ended while nil (e.g. just noting that he went to sleep).
     var endTimestamp: Date?
-    /// Freetext (optional): sleep quality, what he ate, etc.
-    var note: String
+    /// Freetext (optional): sleep quality, what he ate, etc. Carries its source
+    /// language and any translations.
+    var note: LocalizedText
     /// Accumulating audit log of who (which device) edited and when.
     var edits: [EditRecord]
 
@@ -74,14 +75,15 @@ struct LogEntry: Codable, Identifiable, Hashable {
          amount: Amount? = nil,
          moods: [Mood] = [],
          endTimestamp: Date? = nil,
-         note: String = "") {
+         note: String = "",
+         noteLanguage: Language? = nil) {
         self.id = UUID()
         self.timestamp = timestamp
         self.kind = kind
         self.amount = amount
         self.moods = moods
         self.endTimestamp = endTimestamp
-        self.note = note
+        self.note = note.isEmpty ? LocalizedText() : LocalizedText(note, language: noteLanguage)
         self.edits = []
     }
 
@@ -108,7 +110,14 @@ struct LogEntry: Codable, Identifiable, Hashable {
             moods = []
         }
         endTimestamp = try c.decodeIfPresent(Date.self, forKey: .endTimestamp)
-        note = try c.decodeIfPresent(String.self, forKey: .note) ?? ""
+        // Accept the new LocalizedText object, or a pre-1.5 plain string.
+        if let localized = try? c.decodeIfPresent(LocalizedText.self, forKey: .note) {
+            note = localized
+        } else if let legacy = try c.decodeIfPresent(String.self, forKey: .note), !legacy.isEmpty {
+            note = LocalizedText(legacy: legacy)
+        } else {
+            note = LocalizedText()
+        }
         edits = try c.decodeIfPresent([EditRecord].self, forKey: .edits) ?? []
     }
 

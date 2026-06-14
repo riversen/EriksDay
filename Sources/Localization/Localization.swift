@@ -2,7 +2,7 @@ import Foundation
 
 /// The languages the app toggles between, each shown as a flag (+ a code for
 /// the two Norwegian written standards, which share the same flag).
-enum Language: String, CaseIterable, Identifiable {
+enum Language: String, Codable, CaseIterable, Identifiable {
     case en, nb, nn
     var id: String { rawValue }
 
