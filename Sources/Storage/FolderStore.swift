@@ -30,6 +30,9 @@ final class FolderStore: ObservableObject {
     init() {
         deviceName = Self.resolveDeviceName()
         restoreFolder()
+        #if DEBUG
+        loadDemoDataIfRequested()
+        #endif
     }
 
     var hasFolder: Bool { folderURL != nil }
@@ -392,6 +395,62 @@ final class FolderStore: ObservableObject {
         if let coordError { lastError = coordError.localizedDescription }
     }
 }
+
+#if DEBUG
+extension FolderStore {
+    /// Launch with `-demoData` to point at a local, non-synced folder seeded
+    /// with neutral sample content for App Store screenshots. DEBUG only.
+    func loadDemoDataIfRequested() {
+        guard ProcessInfo.processInfo.arguments.contains("-demoData") else { return }
+        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        folderURL = docs.appendingPathComponent("DemoFolder", isDirectory: true)
+        folderName = "Family"
+        try? ensureSubfolders()
+        reloadAll()
+        guard entries.isEmpty, routines.isEmpty else { return }
+
+        func at(_ h: Int, _ m: Int) -> Date {
+            Calendar.current.date(bySettingHour: h, minute: m, second: 0, of: .now) ?? .now
+        }
+        add(LogEntry(kind: .wake, timestamp: at(7, 30)))
+        add(LogEntry(kind: .meal, timestamp: at(8, 0), amount: .normal, note: "Oatmeal and banana"))
+        add(LogEntry(kind: .urine, timestamp: at(9, 10)))
+        add(LogEntry(kind: .mood, timestamp: at(9, 30), moods: [.happy, .energetic]))
+        add(LogEntry(kind: .nap, timestamp: at(12, 30), endTimestamp: at(13, 15)))
+        add(LogEntry(kind: .meal, timestamp: at(15, 0), amount: .little, note: "Apple slices"))
+        add(LogEntry(kind: .note, timestamp: at(16, 20), note: "Great afternoon at the park."))
+
+        saveRoutine(RoutineDoc(id: UUID(), body: """
+        # Sign Language
+
+        Signs we use every day:
+
+        - **More** — tap fingertips together
+        - **All done** — twist hands outward
+        - **Eat** — fingertips to mouth
+        - **Help** — fist on flat palm, lift up
+        """, updatedAt: .now))
+
+        saveRoutine(RoutineDoc(id: UUID(), body: """
+        # Likes
+
+        - Splashing in water
+        - Trampolines
+        - The number 7 bus
+        - Soft blankets
+        """, updatedAt: .now))
+
+        saveRoutine(RoutineDoc(id: UUID(), body: """
+        # Dislikes
+
+        - Loud hand dryers
+        - Sudden changes in plan
+        - Scratchy clothing labels
+        """, updatedAt: .now))
+        reloadAll()
+    }
+}
+#endif
 
 extension JSONEncoder {
     static var eriksDay: JSONEncoder {

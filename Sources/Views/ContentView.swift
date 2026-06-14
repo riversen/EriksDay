@@ -6,6 +6,7 @@ struct ContentView: View {
     @EnvironmentObject private var language: AppLanguage
     @Environment(\.scenePhase) private var scenePhase
     @State private var showingImporter = false
+    @State private var selectedTab = ProcessInfo.processInfo.arguments.contains("-tabRoutines") ? 1 : 0
 
     private var s: Strings { language.s }
 
@@ -44,13 +45,14 @@ struct ContentView: View {
     }
 
     private var tabs: some View {
-        TabView {
+        TabView(selection: $selectedTab) {
             NavigationStack {
                 LogView()
                     .navigationTitle("Erik's Day")
                     .modifier(AppBars())
             }
             .tabItem { Label(s.tabLog, systemImage: "checklist") }
+            .tag(0)
 
             NavigationStack {
                 RoutinesView()
@@ -58,6 +60,7 @@ struct ContentView: View {
                     .modifier(AppBars())
             }
             .tabItem { Label(s.tabRoutines, systemImage: "folder") }
+            .tag(1)
         }
     }
 
