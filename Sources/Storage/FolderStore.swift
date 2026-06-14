@@ -291,11 +291,11 @@ final class FolderStore: ObservableObject {
         d.edits.append(EditRecord(device: deviceName, date: .now))
         withFolderAccess {
             try? FileManager.default.createDirectory(at: routinesURL, withIntermediateDirectories: true)
-            let mdURL = routinesURL.appendingPathComponent("\(d.id.uuidString).md")
+            let mdURL = routineFileURL(in: routinesURL, id: d.id, ext: "md")
             coordinatedWrite(to: mdURL) { url in
                 try d.body.data(using: .utf8)?.write(to: url, options: .atomic)
             }
-            let metaURL = routinesURL.appendingPathComponent("\(d.id.uuidString).json")
+            let metaURL = routineFileURL(in: routinesURL, id: d.id, ext: "json")
             let meta = RoutineMeta(edits: d.edits, sourceLanguage: d.sourceLanguage, translations: d.translations)
             coordinatedWrite(to: metaURL) { url in
                 try JSONEncoder.eriksDay.encode(meta).write(to: url, options: .atomic)
@@ -307,10 +307,29 @@ final class FolderStore: ObservableObject {
     func deleteRoutine(_ doc: RoutineDoc) {
         guard hasFolder, let routinesURL else { return }
         withFolderAccess {
-            moveToTrash(routinesURL.appendingPathComponent("\(doc.id.uuidString).md"), subfolder: "routines")
-            moveToTrash(routinesURL.appendingPathComponent("\(doc.id.uuidString).json"), subfolder: "routines")
+            moveToTrash(routineFileURL(in: routinesURL, id: doc.id, ext: "md"), subfolder: "routines")
+            moveToTrash(routineFileURL(in: routinesURL, id: doc.id, ext: "json"), subfolder: "routines")
         }
         reloadRoutines()
+    }
+
+    /// On-disk URL for a routine file (`<uuid>.<ext>`), matched
+    /// case-insensitively so externally-generated lowercase UUID names resolve
+    /// on case-sensitive filesystems (every iOS device). Editing then
+    /// overwrites the existing file instead of creating an uppercase duplicate,
+    /// and deleting finds it. Falls back to the canonical (uppercase
+    /// `id.uuidString`) name when no file exists yet, i.e. for new docs.
+    private func routineFileURL(in routinesURL: URL, id: UUID, ext: String) -> URL {
+        if let urls = try? FileManager.default.contentsOfDirectory(
+            at: routinesURL, includingPropertiesForKeys: nil),
+           let match = urls.first(where: {
+               $0.pathExtension == ext &&
+               $0.deletingPathExtension().lastPathComponent
+                   .caseInsensitiveCompare(id.uuidString) == .orderedSame
+           }) {
+            return match
+        }
+        return routinesURL.appendingPathComponent("\(id.uuidString).\(ext)")
     }
 
     /// Copy attached media into `routines/media/` and return the routines-
@@ -357,7 +376,11 @@ final class FolderStore: ObservableObject {
                     let body = String(data: data, encoding: .utf8) ?? ""
                     let modified = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?
                         .contentModificationDate ?? .distantPast
-                    let metaURL = dir.appendingPathComponent("\(id.uuidString).json")
+                    // Derive the sidecar path from the md file's actual name,
+                    // not `id.uuidString` (which is uppercase) — externally
+                    // generated files use lowercase UUIDs, and the lookup must
+                    // match on case-sensitive filesystems (every iOS device).
+                    let metaURL = url.deletingPathExtension().appendingPathExtension("json")
                     let meta = (try? Data(contentsOf: metaURL))
                         .flatMap { try? JSONDecoder.eriksDay.decode(RoutineMeta.self, from: $0) }
                     loaded.append(RoutineDoc(id: id, body: body, updatedAt: modified,
@@ -468,7 +491,30 @@ extension JSONEncoder {
 extension JSONDecoder {
     static var eriksDay: JSONDecoder {
         let d = JSONDecoder()
-        d.dateDecodingStrategy = .iso8601
+        // Accept ISO8601 with or without fractional seconds: the app's own
+        // encoder writes whole seconds, but the offline translation process
+        // emits millisecond timestamps. The plain `.iso8601` strategy rejects
+        // fractional seconds on iOS 17's Foundation, which would silently fail
+        // the whole sidecar decode and drop the translations.
+        d.dateDecodingStrategy = .custom { decoder in
+            let s = try decoder.singleValueContainer().decode(String.self)
+            if let date = ISO8601.withFractional.date(from: s)
+                ?? ISO8601.plain.date(from: s) {
+                return date
+            }
+            throw DecodingError.dataCorrupted(.init(
+                codingPath: decoder.codingPath,
+                debugDescription: "Invalid ISO8601 date: \(s)"))
+        }
         return d
     }
+}
+
+private enum ISO8601 {
+    static let withFractional: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f
+    }()
+    static let plain = ISO8601DateFormatter()
 }
