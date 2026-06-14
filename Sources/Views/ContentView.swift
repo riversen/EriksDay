@@ -69,30 +69,30 @@ struct ContentView: View {
 }
 
 /// A pair of flag buttons in the top bar; the active language is highlighted.
+/// Each flag gets a fixed cell so the emoji never clips or squashes, and the
+/// whole control is fixed-size so the toolbar can't compress it.
 private struct LanguageToggle: View {
     @EnvironmentObject private var language: AppLanguage
 
     var body: some View {
-        HStack(spacing: 2) {
+        HStack(spacing: 4) {
             ForEach(Language.allCases) { lang in
+                let selected = language.current == lang
                 Button {
                     language.current = lang
                 } label: {
                     Text(lang.flag)
-                        .font(.title3)
-                        .opacity(language.current == lang ? 1 : 0.35)
-                        .padding(.horizontal, 4)
-                        .padding(.vertical, 2)
-                        .background {
-                            if language.current == lang {
-                                RoundedRectangle(cornerRadius: 6)
-                                    .fill(.quaternary)
-                            }
-                        }
+                        .font(.system(size: 21))
+                        .frame(width: 40, height: 30)
+                        .background(selected ? Color.accentColor.opacity(0.22) : .clear,
+                                    in: RoundedRectangle(cornerRadius: 8))
+                        .opacity(selected ? 1 : 0.4)
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(lang.accessibilityName)
+                .accessibilityAddTraits(selected ? .isSelected : [])
             }
         }
+        .fixedSize()
     }
 }

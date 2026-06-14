@@ -1,0 +1,75 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#6FB7EE"/>
+      <stop offset="1" stop-color="#3F7FC4"/>
+    </linearGradient>
+    <linearGradient id="hair" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#F4CE74"/>
+      <stop offset="1" stop-color="#D79F39"/>
+    </linearGradient>
+    <linearGradient id="shirt" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3A5E86"/>
+      <stop offset="1" stop-color="#2C496A"/>
+    </linearGradient>
+  </defs>
+
+  <!-- background -->
+  <rect width="1024" height="1024" fill="url(#bg)"/>
+  <circle cx="512" cy="450" r="370" fill="#FFFFFF" opacity="0.12"/>
+
+  <!-- shoulders / shirt -->
+  <path d="M 188 1024 C 206 858 356 792 512 792 C 668 792 818 858 836 1024 Z" fill="url(#shirt)"/>
+  <path d="M 512 792 C 470 792 452 824 452 824 C 452 824 482 856 512 856 C 542 856 572 824 572 824 C 572 824 554 792 512 792 Z" fill="#2C496A" opacity="0.6"/>
+
+  <!-- neck -->
+  <path d="M 462 690 L 562 690 L 562 812 C 562 842 462 842 462 812 Z" fill="#E8B488"/>
+  <ellipse cx="512" cy="694" rx="116" ry="38" fill="#CF9A6C" opacity="0.55"/>
+
+  <!-- ears -->
+  <ellipse cx="306" cy="482" rx="34" ry="48" fill="#E8B488"/>
+  <ellipse cx="718" cy="482" rx="34" ry="48" fill="#E8B488"/>
+
+  <!-- head -->
+  <ellipse cx="512" cy="468" rx="208" ry="234" fill="#F4CCA1"/>
+
+  <!-- mouth -->
+  <path d="M 452 612 Q 512 660 572 612 Q 512 642 452 612 Z" fill="#C65B5B"/>
+  <!-- nose -->
+  <path d="M 510 506 C 502 544 496 560 514 568" fill="none" stroke="#D7A471" stroke-width="9" stroke-linecap="round"/>
+  <!-- cheeks -->
+  <ellipse cx="392" cy="556" rx="34" ry="22" fill="#EE9E86" opacity="0.45"/>
+  <ellipse cx="632" cy="556" rx="34" ry="22" fill="#EE9E86" opacity="0.45"/>
+
+  <!-- eyes -->
+  <circle cx="430" cy="474" r="19" fill="#4A3B2A"/>
+  <circle cx="600" cy="474" r="19" fill="#4A3B2A"/>
+  <circle cx="437" cy="467" r="6" fill="#FFFFFF"/>
+  <circle cx="607" cy="467" r="6" fill="#FFFFFF"/>
+
+  <!-- eyebrows -->
+  <path d="M 388 426 Q 430 410 474 424" fill="none" stroke="#C99A3E" stroke-width="13" stroke-linecap="round"/>
+  <path d="M 558 424 Q 600 410 642 426" fill="none" stroke="#C99A3E" stroke-width="13" stroke-linecap="round"/>
+
+  <!-- glasses -->
+  <g fill="#FFFFFF" fill-opacity="0.16" stroke="#33373B" stroke-width="13">
+    <rect x="358" y="424" width="146" height="100" rx="34"/>
+    <rect x="520" y="424" width="146" height="100" rx="34"/>
+  </g>
+  <path d="M 504 452 L 520 452" stroke="#33373B" stroke-width="13" stroke-linecap="round"/>
+  <path d="M 358 452 L 312 458" stroke="#33373B" stroke-width="13" stroke-linecap="round"/>
+  <path d="M 666 452 L 712 458" stroke="#33373B" stroke-width="13" stroke-linecap="round"/>
+
+  <!-- hair: blonde, side-swept fringe -->
+  <path d="M 296 506
+           C 270 300 384 188 512 188
+           C 640 188 754 300 728 506
+           C 716 452 694 430 676 470
+           C 668 426 648 402 612 414
+           C 590 356 532 338 458 372
+           C 414 392 352 396 344 432
+           C 338 458 332 470 320 470
+           C 312 444 304 470 296 506 Z" fill="url(#hair)"/>
+  <path d="M 458 366 C 534 338 588 356 612 414" fill="none" stroke="#F6DC9A" stroke-width="11" stroke-linecap="round" opacity="0.55"/>
+  <path d="M 378 286 C 440 236 556 232 612 274" fill="none" stroke="#F6DC9A" stroke-width="12" stroke-linecap="round" opacity="0.35"/>
+</svg>

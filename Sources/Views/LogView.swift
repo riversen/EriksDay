@@ -6,14 +6,38 @@ struct LogView: View {
 
     @State private var editing: LogEntry?
     @State private var newEntry: LogEntry?
+    @State private var selectedDay: Date = Calendar.current.startOfDay(for: .now)
 
     private var s: Strings { language.s }
 
     private let quickKinds: [LogKind] = [.sleep, .wake, .nap, .meal, .urine, .stool]
     private let columns = [GridItem(.adaptive(minimum: 104), spacing: 12)]
 
-    private var todays: [LogEntry] {
-        store.entries.filter { Calendar.current.isDateInToday($0.timestamp) }
+    private let cal = Calendar.current
+
+    /// Entries on the selected day (store keeps them newest-first).
+    private var dayEntries: [LogEntry] {
+        store.entries.filter { cal.isDate($0.timestamp, inSameDayAs: selectedDay) }
+    }
+
+    /// Days that have at least one entry, for the strip's dots.
+    private var daysWithEntries: Set<Date> {
+        Set(store.entries.map { cal.startOfDay(for: $0.timestamp) })
+    }
+
+    /// A continuous run of days ending today, reaching back far enough to cover
+    /// the oldest entry but always at least two weeks.
+    private var days: [Date] {
+        let today = cal.startOfDay(for: .now)
+        let twoWeeksAgo = cal.date(byAdding: .day, value: -13, to: today) ?? today
+        let oldest = daysWithEntries.min() ?? today
+        var day = min(oldest, twoWeeksAgo)
+        var result: [Date] = []
+        while day <= today {
+            result.append(day)
+            day = cal.date(byAdding: .day, value: 1, to: day) ?? today.addingTimeInterval(1)
+        }
+        return result
     }
 
     var body: some View {
@@ -22,7 +46,9 @@ struct LogView: View {
                 LazyVGrid(columns: columns, spacing: 12) {
                     ForEach(quickKinds) { kind in
                         Button {
-                            store.add(LogEntry(kind: kind))
+                            newEntry = LogEntry(kind: kind,
+                                                timestamp: newEntryDate(),
+                                                amount: kind.hasAmount ? .medium : nil)
                         } label: {
                             VStack(spacing: 6) {
                                 Image(systemName: kind.symbol).font(.title2)
@@ -31,34 +57,34 @@ struct LogView: View {
                             .frame(maxWidth: .infinity, minHeight: 68)
                         }
                         .buttonStyle(.bordered)
-                        .contextMenu {
-                            Button {
-                                newEntry = LogEntry(kind: kind,
-                                                    amount: kind.hasAmount ? .medium : nil)
-                            } label: {
-                                Label(s.addWithDetails, systemImage: "square.and.pencil")
-                            }
-                        }
                     }
                 }
                 .listRowInsets(EdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 8))
             }
 
-            Section(s.today) {
-                if todays.isEmpty {
-                    Text(s.nothingYet)
+            Section {
+                DayStrip(days: days, daysWithEntries: daysWithEntries, selected: $selectedDay)
+                    .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
+                    .listRowBackground(Color.clear)
+            }
+
+            Section {
+                if dayEntries.isEmpty {
+                    Text(cal.isDateInToday(selectedDay) ? s.nothingYet : s.nothingThisDay)
                         .foregroundStyle(.secondary)
                 } else {
-                    ForEach(todays) { entry in
+                    ForEach(dayEntries) { entry in
                         Button { editing = entry } label: {
                             EntryRow(entry: entry)
                         }
                         .buttonStyle(.plain)
                     }
                     .onDelete { offsets in
-                        offsets.map { todays[$0] }.forEach(store.delete)
+                        offsets.map { dayEntries[$0] }.forEach(store.delete)
                     }
                 }
+            } header: {
+                Text(dayTitle)
             }
         }
         .sheet(item: $editing) { entry in
@@ -75,6 +101,78 @@ struct LogView: View {
                             onDelete: nil)
             }
         }
+    }
+
+    private var dayTitle: String {
+        if cal.isDateInToday(selectedDay) { return s.today }
+        if cal.isDateInYesterday(selectedDay) { return s.yesterday }
+        return selectedDay.formatted(
+            .dateTime.weekday(.wide).day().month(.wide).locale(language.current.locale))
+    }
+
+    /// New entries log the actual moment on today; on a past day they are
+    /// back-filled at the current time-of-day so they land on that day.
+    private func newEntryDate() -> Date {
+        if cal.isDateInToday(selectedDay) { return .now }
+        let now = Date.now
+        let hm = cal.dateComponents([.hour, .minute], from: now)
+        return cal.date(bySettingHour: hm.hour ?? 12, minute: hm.minute ?? 0,
+                        second: 0, of: selectedDay) ?? selectedDay
+    }
+}
+
+/// Horizontally scrolling day picker, auto-scrolled to the selected day.
+private struct DayStrip: View {
+    let days: [Date]
+    let daysWithEntries: Set<Date>
+    @Binding var selected: Date
+
+    private let cal = Calendar.current
+
+    var body: some View {
+        ScrollViewReader { proxy in
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(days, id: \.self) { day in
+                        DayCell(day: day,
+                                selected: cal.isDate(day, inSameDayAs: selected),
+                                hasEntries: daysWithEntries.contains(cal.startOfDay(for: day)))
+                            .id(day)
+                            .onTapGesture { selected = day }
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 4)
+            }
+            .onAppear { proxy.scrollTo(selected, anchor: .trailing) }
+            .onChange(of: selected) { _, day in
+                withAnimation { proxy.scrollTo(day, anchor: .center) }
+            }
+        }
+    }
+}
+
+private struct DayCell: View {
+    let day: Date
+    let selected: Bool
+    let hasEntries: Bool
+
+    var body: some View {
+        VStack(spacing: 3) {
+            Text(day, format: .dateTime.weekday(.abbreviated))
+                .font(.caption2)
+                .textCase(.uppercase)
+            Text(day, format: .dateTime.day())
+                .font(.headline)
+            Circle()
+                .frame(width: 5, height: 5)
+                .foregroundStyle(selected ? .white : Color.accentColor)
+                .opacity(hasEntries ? 1 : 0)
+        }
+        .frame(width: 48, height: 64)
+        .foregroundStyle(selected ? Color.white : Color.primary)
+        .background(selected ? Color.accentColor : Color(.secondarySystemBackground),
+                    in: RoundedRectangle(cornerRadius: 12))
     }
 }
 

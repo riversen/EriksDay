@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		4DA0E3C540D2380728238FA7 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D600FB42D4F1B67006D4F46B /* ContentView.swift */; };
+		4F2EA0C48A162D23164CFDDE /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 878EA9A832B8A1645C4555E4 /* Assets.xcassets */; };
 		70B7AD8928CEF590B2D9630A /* Localization.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3E5F3C5B8D458D8547F1C90 /* Localization.swift */; };
 		A785DBAC8ECDF659A2574755 /* LogEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6F0C293656702B9A3969B53 /* LogEntry.swift */; };
 		B5B992CAA4F7EBE9C96E5D00 /* LogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82E79720AF4B318C3C3C9C0E /* LogView.swift */; };
@@ -17,9 +18,10 @@
 
 /* Begin PBXFileReference section */
 		82E79720AF4B318C3C3C9C0E /* LogView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogView.swift; sourceTree = "<group>"; };
+		878EA9A832B8A1645C4555E4 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		9E8DB129C97646BA0D00E358 /* EriksDayApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EriksDayApp.swift; sourceTree = "<group>"; };
 		AB0E7D29CBDF344D6BC6D185 /* FolderStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FolderStore.swift; sourceTree = "<group>"; };
-		C1F5E9212DC2DD26790379FF /* EriksDay.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = EriksDay.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		C1F5E9212DC2DD26790379FF /* EriksDay.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = EriksDay.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C6F0C293656702B9A3969B53 /* LogEntry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogEntry.swift; sourceTree = "<group>"; };
 		D3E5F3C5B8D458D8547F1C90 /* Localization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Localization.swift; sourceTree = "<group>"; };
 		D600FB42D4F1B67006D4F46B /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -45,6 +47,7 @@
 		52ED969FDCB22EA9CC32E99C /* Sources */ = {
 			isa = PBXGroup;
 			children = (
+				878EA9A832B8A1645C4555E4 /* Assets.xcassets */,
 				9E8DB129C97646BA0D00E358 /* EriksDayApp.swift */,
 				4EE4FC50F98EF9C23367F328 /* Localization */,
 				12AFDF41E01D6C9B0152F010 /* Models */,
@@ -95,6 +98,7 @@
 			buildConfigurationList = 8D0D58D2B6389CF34EA28067 /* Build configuration list for PBXNativeTarget "EriksDay" */;
 			buildPhases = (
 				7A244E0F4DC8FC4713CCEAE7 /* Sources */,
+				A16451B40F5C53B0993F1701 /* Resources */,
 			);
 			buildRules = (
 			);
@@ -140,6 +144,17 @@
 		};
 /* End PBXProject section */
 
+/* Begin PBXResourcesBuildPhase section */
+		A16451B40F5C53B0993F1701 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				4F2EA0C48A162D23164CFDDE /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
 /* Begin PBXSourcesBuildPhase section */
 		7A244E0F4DC8FC4713CCEAE7 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
@@ -164,6 +179,7 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = GYAAX4JTDW;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "Erik's Day";
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -186,6 +202,7 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = GYAAX4JTDW;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "Erik's Day";
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;

@@ -82,8 +82,9 @@ struct Strings {
 
     // Log screen
     var today: String { t("Today", "I dag") }
+    var yesterday: String { t("Yesterday", "I går") }
     var nothingYet: String { t("Nothing logged yet today.", "Ingenting registrert i dag ennå.") }
-    var addWithDetails: String { t("Add with details…", "Legg til med detaljer …") }
+    var nothingThisDay: String { t("Nothing logged this day.", "Ingenting registrert denne dagen.") }
     var ongoing: String { t("ongoing", "pågår") }
 
     // Editor
