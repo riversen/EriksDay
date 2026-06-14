@@ -10,8 +10,9 @@ struct LogView: View {
 
     private var s: Strings { language.s }
 
-    private let quickKinds: [LogKind] = [.sleep, .wake, .nap, .meal, .urine, .stool]
-    private let columns = [GridItem(.adaptive(minimum: 104), spacing: 12)]
+    private let quickKinds: [LogKind] = [.sleep, .wake, .nap, .meal, .urine, .stool, .mood, .note]
+    // Fixed 4 columns so 8 kinds lay out as a compact 4×2 grid on iPhone.
+    private let columns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 4)
 
     private let cal = Calendar.current
 
@@ -43,23 +44,25 @@ struct LogView: View {
     var body: some View {
         List {
             Section {
-                LazyVGrid(columns: columns, spacing: 12) {
+                LazyVGrid(columns: columns, spacing: 8) {
                     ForEach(quickKinds) { kind in
                         Button {
                             newEntry = LogEntry(kind: kind,
                                                 timestamp: newEntryDate(),
-                                                amount: kind.hasAmount ? .medium : nil)
+                                                amount: kind.hasAmount ? .medium : nil,
+                                                mood: kind.hasMood ? .okay : nil)
                         } label: {
-                            VStack(spacing: 6) {
-                                Image(systemName: kind.symbol).font(.title2)
-                                Text(s.kind(kind)).font(.caption)
+                            VStack(spacing: 3) {
+                                Image(systemName: kind.symbol).font(.body)
+                                Text(s.kind(kind)).font(.caption2)
                             }
-                            .frame(maxWidth: .infinity, minHeight: 68)
+                            .frame(maxWidth: .infinity, minHeight: 40)
                         }
                         .buttonStyle(.bordered)
+                        .controlSize(.small)
                     }
                 }
-                .listRowInsets(EdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 8))
+                .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
             }
 
             Section {
@@ -192,6 +195,9 @@ private struct EntryRow: View {
                 if let amount = entry.amount {
                     Text(s.amount(amount)).font(.caption).foregroundStyle(.secondary)
                 }
+                if let mood = entry.mood {
+                    Text(s.mood(mood)).font(.caption).foregroundStyle(.secondary)
+                }
                 if !entry.note.isEmpty {
                     Text(entry.note).font(.caption).foregroundStyle(.secondary).lineLimit(2)
                 }
@@ -215,6 +221,43 @@ private struct EntryRow: View {
     }
 }
 
+/// A wrapping grid of single-select mood chips — handles many options far
+/// better than a segmented control would.
+private struct MoodPicker: View {
+    @EnvironmentObject private var language: AppLanguage
+    @Binding var selection: Mood
+
+    private let columns = [GridItem(.adaptive(minimum: 92), spacing: 8)]
+
+    var body: some View {
+        LazyVGrid(columns: columns, spacing: 8) {
+            ForEach(Mood.allCases) { mood in
+                Button {
+                    selection = mood
+                } label: {
+                    Text(language.s.mood(mood))
+                }
+                .buttonStyle(MoodChipStyle(selected: selection == mood))
+            }
+        }
+        .padding(.vertical, 4)
+    }
+}
+
+private struct MoodChipStyle: ButtonStyle {
+    let selected: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.subheadline)
+            .frame(maxWidth: .infinity, minHeight: 36)
+            .background(selected ? Color.accentColor : Color(.secondarySystemBackground),
+                        in: Capsule())
+            .foregroundStyle(selected ? Color.white : Color.primary)
+            .opacity(configuration.isPressed ? 0.7 : 1)
+    }
+}
+
 private struct EntryEditor: View {
     @EnvironmentObject private var language: AppLanguage
     @Environment(\.dismiss) private var dismiss
@@ -223,6 +266,7 @@ private struct EntryEditor: View {
     @State private var hasEnd: Bool
     @State private var endDate: Date
     @State private var amount: Amount
+    @State private var mood: Mood
 
     let isNew: Bool
     let onSave: (LogEntry) -> Void
@@ -235,6 +279,7 @@ private struct EntryEditor: View {
         _hasEnd = State(initialValue: entry.endTimestamp != nil)
         _endDate = State(initialValue: entry.endTimestamp ?? entry.timestamp)
         _amount = State(initialValue: entry.amount ?? .medium)
+        _mood = State(initialValue: entry.mood ?? .okay)
         self.isNew = isNew
         self.onSave = onSave
         self.onDelete = onDelete
@@ -269,6 +314,12 @@ private struct EntryEditor: View {
                 }
             }
 
+            if kind.hasMood {
+                Section(s.mood) {
+                    MoodPicker(selection: $mood)
+                }
+            }
+
             Section(s.notes) {
                 TextField(notePrompt, text: $entry.note, axis: .vertical)
                     .lineLimit(1...6)
@@ -299,6 +350,8 @@ private struct EntryEditor: View {
         switch kind {
         case .sleep, .nap: s.sleepNotePrompt
         case .meal:        s.mealNotePrompt
+        case .mood:        s.moodNotePrompt
+        case .note:        s.notePrompt
         default:           s.notes
         }
     }
@@ -307,6 +360,7 @@ private struct EntryEditor: View {
         var e = entry
         e.endTimestamp = kind.hasDuration && hasEnd ? endDate : nil
         e.amount = kind.hasAmount ? amount : nil
+        e.mood = kind.hasMood ? mood : nil
         onSave(e)
         dismiss()
     }

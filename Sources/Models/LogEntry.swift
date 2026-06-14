@@ -1,7 +1,7 @@
 import Foundation
 
 enum LogKind: String, Codable, CaseIterable, Identifiable {
-    case sleep, wake, nap, meal, urine, stool, note
+    case sleep, wake, nap, meal, urine, stool, mood, note
     var id: String { rawValue }
 
     var symbol: String {
@@ -12,6 +12,7 @@ enum LogKind: String, Codable, CaseIterable, Identifiable {
         case .meal:  "fork.knife"
         case .urine: "drop.fill"
         case .stool: "toilet.fill"
+        case .mood:  "face.smiling"
         case .note:  "note.text"
         }
     }
@@ -21,10 +22,18 @@ enum LogKind: String, Codable, CaseIterable, Identifiable {
 
     /// Meals record how much was eaten.
     var hasAmount: Bool { self == .meal }
+
+    /// Mood entries record how he seemed.
+    var hasMood: Bool { self == .mood }
 }
 
 enum Amount: String, Codable, CaseIterable, Identifiable {
     case little, medium, lots
+    var id: String { rawValue }
+}
+
+enum Mood: String, Codable, CaseIterable, Identifiable {
+    case happy, energetic, relaxed, okay, tired, loud, sad, upset
     var id: String { rawValue }
 }
 
@@ -35,6 +44,7 @@ struct LogEntry: Codable, Identifiable, Hashable {
     var timestamp: Date
     var kind: LogKind
     var amount: Amount?
+    var mood: Mood?
     /// Open-ended while nil (e.g. just noting that he went to sleep).
     var endTimestamp: Date?
     /// Freetext: for sleep this is where quality/how-he-settled goes; for a
@@ -44,12 +54,14 @@ struct LogEntry: Codable, Identifiable, Hashable {
     init(kind: LogKind,
          timestamp: Date = .now,
          amount: Amount? = nil,
+         mood: Mood? = nil,
          endTimestamp: Date? = nil,
          note: String = "") {
         self.id = UUID()
         self.timestamp = timestamp
         self.kind = kind
         self.amount = amount
+        self.mood = mood
         self.endTimestamp = endTimestamp
         self.note = note
     }

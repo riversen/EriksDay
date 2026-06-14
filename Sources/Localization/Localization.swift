@@ -93,6 +93,7 @@ struct Strings {
     var hasWokenUp: String { t("Has woken up", "Har våknet") }
     var wokeUp: String { t("Woke up", "Våknet") }
     var amount: String { t("Amount", "Mengde") }
+    var mood: String { t("Mood", "Humør") }
     var notes: String { t("Notes", "Notater") }
     var cancel: String { t("Cancel", "Avbryt") }
     var add: String { t("Add", "Legg til") }
@@ -101,6 +102,8 @@ struct Strings {
 
     var sleepNotePrompt: String { t("Sleep quality, how he settled…", "Søvnkvalitet, hvordan han la seg …") }
     var mealNotePrompt: String { t("What he ate", "Hva han spiste") }
+    var moodNotePrompt: String { t("What happened, how he seemed…", "Hva skjedde, hvordan han virket …") }
+    var notePrompt: String { t("Anything worth noting…", "Noe verdt å notere …") }
 
     // Enum labels
     func kind(_ kind: LogKind) -> String {
@@ -111,6 +114,7 @@ struct Strings {
         case .meal:  t("Meal", "Måltid")
         case .urine: t("Pee", "Tiss")
         case .stool: t("Poop", "Bæsj")
+        case .mood:  t("Mood", "Humør")
         case .note:  t("Note", "Notat")
         }
     }
@@ -120,6 +124,19 @@ struct Strings {
         case .little: t("A little", "Litt")
         case .medium: t("Medium", "Middels")
         case .lots:   t("A lot", "Mye")
+        }
+    }
+
+    func mood(_ mood: Mood) -> String {
+        switch mood {
+        case .happy:     t("Happy", "Glad")
+        case .energetic: t("Energetic", "Energisk")
+        case .relaxed:   t("Relaxed", "Avslappet")
+        case .okay:      t("Okay", "Grei")
+        case .tired:     t("Tired", "Trøtt")
+        case .loud:      t("Loud", "Høylytt")
+        case .sad:       t("Sad", "Trist")
+        case .upset:     t("Upset", "Opprørt")
         }
     }
 }
