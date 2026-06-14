@@ -10,31 +10,19 @@ struct ContentView: View {
     private var s: Strings { language.s }
 
     var body: some View {
-        NavigationStack {
-            Group {
-                if store.hasFolder {
-                    LogView()
-                } else {
+        Group {
+            if store.hasFolder {
+                tabs
+            } else {
+                NavigationStack {
                     folderPrompt
-                }
-            }
-            .navigationTitle("Erik's Day")
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    LanguageToggle()
-                }
-                if store.hasFolder {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button {
-                            store.reload()
-                        } label: {
-                            Image(systemName: "arrow.clockwise")
+                        .navigationTitle("Erik's Day")
+                        .toolbar {
+                            ToolbarItem(placement: .topBarLeading) { LanguageToggle() }
+                            ToolbarItem(placement: .topBarTrailing) { AppLogoView() }
                         }
-                    }
                 }
             }
-            // 24-hour clock always; month names/date order follow the language.
-            .environment(\.locale, language.current.locale)
         }
         .fileImporter(isPresented: $showingImporter, allowedContentTypes: [.folder]) { result in
             switch result {
@@ -42,10 +30,9 @@ struct ContentView: View {
             case .failure(let error): store.lastError = error.localizedDescription
             }
         }
-        // Pull fresh files when returning to the app. A file presenter would
-        // give live updates; this is enough for the first iteration.
+        // Pull fresh files when returning to the app.
         .onChange(of: scenePhase) { _, phase in
-            if phase == .active { store.reload() }
+            if phase == .active { store.reloadAll() }
         }
         .alert(s.errorTitle,
                isPresented: Binding(get: { store.lastError != nil },
@@ -53,6 +40,24 @@ struct ContentView: View {
             Button(s.ok, role: .cancel) { }
         } message: {
             Text(store.lastError ?? "")
+        }
+    }
+
+    private var tabs: some View {
+        TabView {
+            NavigationStack {
+                LogView()
+                    .navigationTitle("Erik's Day")
+                    .modifier(AppBars())
+            }
+            .tabItem { Label(s.tabLog, systemImage: "checklist") }
+
+            NavigationStack {
+                RoutinesView()
+                    .navigationTitle(s.routines)
+                    .modifier(AppBars())
+            }
+            .tabItem { Label(s.tabRoutines, systemImage: "folder") }
         }
     }
 
@@ -68,9 +73,39 @@ struct ContentView: View {
     }
 }
 
-/// A pair of flag buttons in the top bar; the active language is highlighted.
-/// Each flag gets a fixed cell so the emoji never clips or squashes, and the
-/// whole control is fixed-size so the toolbar can't compress it.
+/// Shared top bar for both tabs: language toggle (leading), refresh + app
+/// icon (trailing).
+private struct AppBars: ViewModifier {
+    @EnvironmentObject private var store: FolderStore
+
+    func body(content: Content) -> some View {
+        content.toolbar {
+            ToolbarItem(placement: .topBarLeading) { LanguageToggle() }
+            ToolbarItem(placement: .topBarTrailing) {
+                HStack(spacing: 12) {
+                    Button { store.reloadAll() } label: {
+                        Image(systemName: "arrow.clockwise")
+                    }
+                    AppLogoView()
+                }
+            }
+        }
+    }
+}
+
+/// Tiny app icon shown in the top-right.
+private struct AppLogoView: View {
+    var body: some View {
+        Image("AppLogo")
+            .resizable()
+            .frame(width: 26, height: 26)
+            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+            .accessibilityHidden(true)
+    }
+}
+
+/// Flag buttons for the three languages; the active one is highlighted. The two
+/// Norwegian standards share the flag, so each chip also shows its code.
 private struct LanguageToggle: View {
     @EnvironmentObject private var language: AppLanguage
 
@@ -81,12 +116,14 @@ private struct LanguageToggle: View {
                 Button {
                     language.current = lang
                 } label: {
-                    Text(lang.flag)
-                        .font(.system(size: 21))
-                        .frame(width: 40, height: 30)
-                        .background(selected ? Color.accentColor.opacity(0.22) : .clear,
-                                    in: RoundedRectangle(cornerRadius: 8))
-                        .opacity(selected ? 1 : 0.4)
+                    VStack(spacing: 0) {
+                        Text(lang.flag).font(.system(size: 16))
+                        Text(lang.code).font(.system(size: 9, weight: .semibold))
+                    }
+                    .frame(width: 34, height: 34)
+                    .background(selected ? Color.accentColor.opacity(0.22) : .clear,
+                                in: RoundedRectangle(cornerRadius: 8))
+                    .opacity(selected ? 1 : 0.4)
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(lang.accessibilityName)

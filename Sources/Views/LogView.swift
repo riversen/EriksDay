@@ -31,7 +31,9 @@ struct LogView: View {
     private var days: [Date] {
         let today = cal.startOfDay(for: .now)
         let twoWeeksAgo = cal.date(byAdding: .day, value: -13, to: today) ?? today
-        let oldest = daysWithEntries.min() ?? today
+        // earliest comes from week-folder names (cheap), so the strip can reach
+        // back past what's currently loaded into memory.
+        let oldest = store.earliestEntryDate.map { cal.startOfDay(for: $0) } ?? today
         var day = min(oldest, twoWeeksAgo)
         var result: [Date] = []
         while day <= today {
@@ -49,8 +51,7 @@ struct LogView: View {
                         Button {
                             newEntry = LogEntry(kind: kind,
                                                 timestamp: newEntryDate(),
-                                                amount: kind.hasAmount ? .medium : nil,
-                                                mood: kind.hasMood ? .okay : nil)
+                                                amount: kind.hasAmount ? .normal : nil)
                         } label: {
                             VStack(spacing: 3) {
                                 Image(systemName: kind.symbol).font(.body)
@@ -90,6 +91,8 @@ struct LogView: View {
                 Text(dayTitle)
             }
         }
+        .onAppear { store.ensureLoaded(weekOf: selectedDay) }
+        .onChange(of: selectedDay) { _, day in store.ensureLoaded(weekOf: day) }
         .sheet(item: $editing) { entry in
             NavigationStack {
                 EntryEditor(entry: entry, isNew: false,
@@ -195,8 +198,9 @@ private struct EntryRow: View {
                 if let amount = entry.amount {
                     Text(s.amount(amount)).font(.caption).foregroundStyle(.secondary)
                 }
-                if let mood = entry.mood {
-                    Text(s.mood(mood)).font(.caption).foregroundStyle(.secondary)
+                if !entry.moods.isEmpty {
+                    Text(entry.moods.map(s.mood).joined(separator: ", "))
+                        .font(.caption).foregroundStyle(.secondary)
                 }
                 if !entry.note.isEmpty {
                     Text(entry.note).font(.caption).foregroundStyle(.secondary).lineLimit(2)
@@ -221,11 +225,11 @@ private struct EntryRow: View {
     }
 }
 
-/// A wrapping grid of single-select mood chips — handles many options far
-/// better than a segmented control would.
+/// A wrapping grid of multi-select mood chips — more than one can be true at
+/// once (e.g. energetic and loud).
 private struct MoodPicker: View {
     @EnvironmentObject private var language: AppLanguage
-    @Binding var selection: Mood
+    @Binding var selection: Set<Mood>
 
     private let columns = [GridItem(.adaptive(minimum: 92), spacing: 8)]
 
@@ -233,11 +237,12 @@ private struct MoodPicker: View {
         LazyVGrid(columns: columns, spacing: 8) {
             ForEach(Mood.allCases) { mood in
                 Button {
-                    selection = mood
+                    if selection.contains(mood) { selection.remove(mood) }
+                    else { selection.insert(mood) }
                 } label: {
                     Text(language.s.mood(mood))
                 }
-                .buttonStyle(MoodChipStyle(selected: selection == mood))
+                .buttonStyle(MoodChipStyle(selected: selection.contains(mood)))
             }
         }
         .padding(.vertical, 4)
@@ -266,7 +271,7 @@ private struct EntryEditor: View {
     @State private var hasEnd: Bool
     @State private var endDate: Date
     @State private var amount: Amount
-    @State private var mood: Mood
+    @State private var moods: Set<Mood>
 
     let isNew: Bool
     let onSave: (LogEntry) -> Void
@@ -278,8 +283,8 @@ private struct EntryEditor: View {
         _entry = State(initialValue: entry)
         _hasEnd = State(initialValue: entry.endTimestamp != nil)
         _endDate = State(initialValue: entry.endTimestamp ?? entry.timestamp)
-        _amount = State(initialValue: entry.amount ?? .medium)
-        _mood = State(initialValue: entry.mood ?? .okay)
+        _amount = State(initialValue: entry.amount ?? .normal)
+        _moods = State(initialValue: Set(entry.moods))
         self.isNew = isNew
         self.onSave = onSave
         self.onDelete = onDelete
@@ -316,13 +321,27 @@ private struct EntryEditor: View {
 
             if kind.hasMood {
                 Section(s.mood) {
-                    MoodPicker(selection: $mood)
+                    MoodPicker(selection: $moods)
                 }
             }
 
-            Section(s.notes) {
+            Section(s.notesOptional) {
                 TextField(notePrompt, text: $entry.note, axis: .vertical)
                     .lineLimit(1...6)
+            }
+
+            if !entry.edits.isEmpty {
+                Section(s.history) {
+                    ForEach(Array(entry.edits.enumerated()), id: \.offset) { _, edit in
+                        HStack {
+                            Text(edit.device).font(.caption)
+                            Spacer()
+                            Text(edit.date, format: .dateTime.day().month().hour().minute()
+                                .locale(language.current.locale))
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                }
             }
 
             if let onDelete {
@@ -360,7 +379,7 @@ private struct EntryEditor: View {
         var e = entry
         e.endTimestamp = kind.hasDuration && hasEnd ? endDate : nil
         e.amount = kind.hasAmount ? amount : nil
-        e.mood = kind.hasMood ? mood : nil
+        e.moods = kind.hasMood ? Mood.allCases.filter { moods.contains($0) } : []
         onSave(e)
         dismiss()
     }
