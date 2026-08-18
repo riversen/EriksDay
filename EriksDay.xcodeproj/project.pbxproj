@@ -7,9 +7,11 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		3B2E12646A728DE41C25B9F4 /* AppLock.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFA9E4BF4C6ABDE3675FCB1B /* AppLock.swift */; };
 		4944173BD1772F3B704A7218 /* FolderIO.swift in Sources */ = {isa = PBXBuildFile; fileRef = 403211EDC583DA91870054C4 /* FolderIO.swift */; };
 		4DA0E3C540D2380728238FA7 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D600FB42D4F1B67006D4F46B /* ContentView.swift */; };
 		4F2EA0C48A162D23164CFDDE /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 878EA9A832B8A1645C4555E4 /* Assets.xcassets */; };
+		6EACDD450E8CD0729EA15286 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F18E7645E3D31E55452689AF /* RootView.swift */; };
 		70B7AD8928CEF590B2D9630A /* Localization.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3E5F3C5B8D458D8547F1C90 /* Localization.swift */; };
 		7743AE0864E8AD7F377D0144 /* RoutineDoc.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99C92FC3D5249B87A60709F2 /* RoutineDoc.swift */; };
 		86B963FA18BAC55E65E846D3 /* LocalizedText.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4828E21A692970751D02362B /* LocalizedText.swift */; };
@@ -29,10 +31,12 @@
 		99C92FC3D5249B87A60709F2 /* RoutineDoc.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoutineDoc.swift; sourceTree = "<group>"; };
 		9E8DB129C97646BA0D00E358 /* EriksDayApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EriksDayApp.swift; sourceTree = "<group>"; };
 		AB0E7D29CBDF344D6BC6D185 /* FolderStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FolderStore.swift; sourceTree = "<group>"; };
+		AFA9E4BF4C6ABDE3675FCB1B /* AppLock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLock.swift; sourceTree = "<group>"; };
 		C1F5E9212DC2DD26790379FF /* EriksDay.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = EriksDay.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C6F0C293656702B9A3969B53 /* LogEntry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogEntry.swift; sourceTree = "<group>"; };
 		D3E5F3C5B8D458D8547F1C90 /* Localization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Localization.swift; sourceTree = "<group>"; };
 		D600FB42D4F1B67006D4F46B /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		F18E7645E3D31E55452689AF /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -44,6 +48,14 @@
 				99C92FC3D5249B87A60709F2 /* RoutineDoc.swift */,
 			);
 			path = Models;
+			sourceTree = "<group>";
+		};
+		3AA196FB1AAE16EFBBAB4704 /* Security */ = {
+			isa = PBXGroup;
+			children = (
+				AFA9E4BF4C6ABDE3675FCB1B /* AppLock.swift */,
+			);
+			path = Security;
 			sourceTree = "<group>";
 		};
 		4EE4FC50F98EF9C23367F328 /* Localization */ = {
@@ -61,6 +73,7 @@
 				9E8DB129C97646BA0D00E358 /* EriksDayApp.swift */,
 				4EE4FC50F98EF9C23367F328 /* Localization */,
 				12AFDF41E01D6C9B0152F010 /* Models */,
+				3AA196FB1AAE16EFBBAB4704 /* Security */,
 				6DDD906EBEDF35AC3F4E7668 /* Storage */,
 				5FFA663915BB8BF31E86CFED /* Views */,
 			);
@@ -72,6 +85,7 @@
 			children = (
 				D600FB42D4F1B67006D4F46B /* ContentView.swift */,
 				82E79720AF4B318C3C3C9C0E /* LogView.swift */,
+				F18E7645E3D31E55452689AF /* RootView.swift */,
 				91CB50CD20016A1521209076 /* RoutinesView.swift */,
 			);
 			path = Views;
@@ -173,6 +187,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				3B2E12646A728DE41C25B9F4 /* AppLock.swift in Sources */,
 				4DA0E3C540D2380728238FA7 /* ContentView.swift in Sources */,
 				D9FD62B72EEFD457D16EB2BB /* EriksDayApp.swift in Sources */,
 				4944173BD1772F3B704A7218 /* FolderIO.swift in Sources */,
@@ -181,6 +196,7 @@
 				86B963FA18BAC55E65E846D3 /* LocalizedText.swift in Sources */,
 				A785DBAC8ECDF659A2574755 /* LogEntry.swift in Sources */,
 				B5B992CAA4F7EBE9C96E5D00 /* LogView.swift in Sources */,
+				6EACDD450E8CD0729EA15286 /* RootView.swift in Sources */,
 				7743AE0864E8AD7F377D0144 /* RoutineDoc.swift in Sources */,
 				C69A67D198AB884353E51F25 /* RoutinesView.swift in Sources */,
 			);

@@ -485,17 +485,27 @@ private struct MediaView: View {
             }
         }
         .task { await load() }
+        .onDisappear(perform: discardTempCopy)
     }
 
     private func load() async {
         guard image == nil, videoURL == nil, let data = await store.mediaData(path) else { return }
         if isVideo {
+            // AVPlayer needs a file URL, so the clip is copied out briefly.
+            // Protected while the device is locked, and removed on disappear
+            // so care media doesn't linger in tmp.
             let tmp = FileManager.default.temporaryDirectory
                 .appendingPathComponent((path as NSString).lastPathComponent)
-            try? data.write(to: tmp)
+            try? data.write(to: tmp, options: [.atomic, .completeFileProtection])
             videoURL = tmp
         } else {
             image = UIImage(data: data)
         }
+    }
+
+    private func discardTempCopy() {
+        guard let videoURL else { return }
+        try? FileManager.default.removeItem(at: videoURL)
+        self.videoURL = nil
     }
 }

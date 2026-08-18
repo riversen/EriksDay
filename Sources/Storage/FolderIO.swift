@@ -59,7 +59,12 @@ struct IOResult<T: Sendable>: Sendable {
     var error: String?
 }
 
-/// All file access for the shared folder. This is an `actor` on purpose: the
+/// All file access for the shared folder. Files are written with the
+/// `completeUntilFirstUserAuthentication` protection class: it keeps data
+/// unreadable on a powered-off device without blocking the background sync
+/// that stricter classes can stall while the device is locked.
+///
+/// This is an `actor` on purpose: the
 /// work runs off the main thread (coordinated iCloud reads can block for
 /// seconds while a file is downloaded) and is serialized, so concurrent
 /// reloads and writes never race on the same folder.
@@ -223,7 +228,7 @@ actor FolderIO {
             NSFileCoordinator().coordinate(writingItemAt: folder.appendingPathComponent(name),
                                            options: .forReplacing, error: &coordError) { url in
                 do {
-                    try JSONEncoder.eriksDay.encode(entry).write(to: url, options: .atomic)
+                    try JSONEncoder.eriksDay.encode(entry).write(to: url, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
                     stamp = FileStamp(url)
                 } catch let writeError {
                     error = "Write failed: \(writeError.localizedDescription)"
@@ -252,7 +257,7 @@ actor FolderIO {
             var coordError: NSError?
             NSFileCoordinator().coordinate(writingItemAt: mdURL, options: .forReplacing,
                                            error: &coordError) { url in
-                try? doc.body.data(using: .utf8)?.write(to: url, options: .atomic)
+                try? doc.body.data(using: .utf8)?.write(to: url, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
             }
             if let coordError { error = coordError.localizedDescription }
 
@@ -262,7 +267,7 @@ actor FolderIO {
             let metaURL = routineFileURL(id: doc.id, ext: "json")
             NSFileCoordinator().coordinate(writingItemAt: metaURL, options: .forReplacing,
                                            error: &coordError) { url in
-                try? JSONEncoder.eriksDay.encode(meta).write(to: url, options: .atomic)
+                try? JSONEncoder.eriksDay.encode(meta).write(to: url, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
             }
             if let coordError { error = coordError.localizedDescription }
         }
@@ -289,7 +294,7 @@ actor FolderIO {
             var coordError: NSError?
             NSFileCoordinator().coordinate(writingItemAt: mediaURL.appendingPathComponent(name),
                                            options: .forReplacing, error: &coordError) { url in
-                ok = (try? data.write(to: url, options: .atomic)) != nil
+                ok = (try? data.write(to: url, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])) != nil
             }
         }
         return ok ? "media/\(name)" : nil

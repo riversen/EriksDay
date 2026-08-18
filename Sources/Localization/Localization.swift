@@ -130,6 +130,30 @@ struct Strings {
           "Blir lagra som ei søvnoppføring med start- og sluttid. La stå av om du ikkje veit.")
     }
     var fromLabel: String { t("From", "Fra", "Frå") }
+
+    // Security / settings
+    var settings: String { t("Settings", "Innstillinger", "Innstillingar") }
+    var security: String { t("Security", "Sikkerhet", "Tryggleik") }
+    var done: String { t("Done", "Ferdig", "Ferdig") }
+    var requireUnlock: String {
+        t("Require Face ID or passcode", "Krev Face ID eller kode", "Krev Face ID eller kode")
+    }
+    var requireUnlockHelp: String {
+        t("Erik's Day holds health information. When this is on, the app asks for Face ID, Touch ID or the device passcode before showing anything.",
+          "Erik's Day inneholder helseopplysninger. Når dette er på, ber appen om Face ID, Touch ID eller enhetens kode før noe vises.",
+          "Erik's Day inneheld helseopplysningar. Når dette er på, ber appen om Face ID, Touch ID eller koden til eininga før noko blir vist.")
+    }
+    var appLocked: String { t("Erik's Day is locked", "Erik's Day er låst", "Erik's Day er låst") }
+    var unlock: String { t("Unlock", "Lås opp", "Lås opp") }
+    var unlockReason: String { t("Unlock Erik's Day", "Lås opp Erik's Day", "Lås opp Erik's Day") }
+    var passcodeNeeded: String {
+        t("This device has no passcode. Set one in Settings to protect the information in Erik's Day.",
+          "Denne enheten har ingen kode. Angi en kode i Innstillinger for å beskytte opplysningene i Erik's Day.",
+          "Denne eininga har ingen kode. Vel ein kode i Innstillingar for å verne opplysningane i Erik's Day.")
+    }
+    var openSettings: String { t("Open Settings", "Åpne Innstillinger", "Opne Innstillingar") }
+    var folderLabel: String { t("Folder", "Mappe", "Mappe") }
+    var thisDevice: String { t("This device", "Denne enheten", "Denne eininga") }
     var cancel: String { t("Cancel", "Avbryt", "Avbryt") }
     var add: String { t("Add", "Legg til", "Legg til") }
     var save: String { t("Save", "Lagre", "Lagre") }

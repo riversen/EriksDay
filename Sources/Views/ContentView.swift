@@ -80,19 +80,25 @@ struct ContentView: View {
 /// icon (trailing).
 private struct AppBars: ViewModifier {
     @EnvironmentObject private var store: FolderStore
+    @State private var showingSettings = false
 
     func body(content: Content) -> some View {
-        content.toolbar {
-            ToolbarItem(placement: .topBarLeading) { LanguageToggle() }
-            ToolbarItem(placement: .topBarTrailing) {
-                HStack(spacing: 12) {
-                    Button { store.reloadAll() } label: {
-                        Image(systemName: "arrow.clockwise")
+        content
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) { LanguageToggle() }
+                ToolbarItem(placement: .topBarTrailing) {
+                    HStack(spacing: 12) {
+                        Button { store.reloadAll() } label: {
+                            Image(systemName: "arrow.clockwise")
+                        }
+                        Button { showingSettings = true } label: {
+                            Image(systemName: "gearshape")
+                        }
+                        AppLogoView()
                     }
-                    AppLogoView()
                 }
             }
-        }
+            .sheet(isPresented: $showingSettings) { SettingsView() }
     }
 }
 
