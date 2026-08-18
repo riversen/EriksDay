@@ -34,13 +34,32 @@ from their own devices.
 ```
 Sources/
   EriksDayApp.swift        app entry, injects FolderStore + AppLanguage
-  Models/LogEntry.swift    Codable structs + enums (LogKind, Amount)
-  Storage/FolderStore.swift  bookmark mgmt + coordinated file-per-entry I/O
-  Localization/Localization.swift  Language + AppLanguage + Strings table
-  Views/ContentView.swift  router (folder picker vs log) + importer + alert + flag toggle
-  Views/LogView.swift      one-tap buttons + today's timeline + entry editor
+  Models/LogEntry.swift    LogKind, Amount, Mood, EditRecord, LogEntry (+ day-span helpers)
+  Models/RoutineDoc.swift  RoutineDoc + RoutineMeta sidecar
+  Models/LocalizedText.swift  free text + source language + translations
+  Storage/FolderIO.swift   actor: all file access, off the main thread
+  Storage/FolderStore.swift  @MainActor cache the UI reads; optimistic writes
+  Localization/Localization.swift  Language (en/nb/nn) + AppLanguage + Strings
+  Views/ContentView.swift  tabs, folder picker, flag toggle, app-icon badge
+  Views/LogView.swift      quick buttons + day strip + timeline + entry editor
+  Views/RoutinesView.swift routine list, markdown editor + preview, media
 project.yml                XcodeGen spec
 ```
+
+On disk, inside the shared folder:
+
+```
+entries/<ISO-week>/<uuid>.json   one file per event, sharded by week
+routines/<uuid>.md               markdown body (the source text)
+routines/<uuid>.json             sidecar: edits, sourceLanguage, translations
+routines/media/<uuid>.<ext>      copied photos/videos referenced by markdown
+.trash/<entries|routines>/…      deletes move here; nothing is erased
+```
+
+Free text (entry notes, routine bodies) records the language it was written
+in and carries a `translations` map an offline process can fill; the UI falls
+back to the closest available language. Every entry keeps an `edits` audit
+log of which device changed it and when.
 
 ## Build
 
@@ -55,18 +74,22 @@ Set the signing team in Xcode (Signing & Capabilities, automatic), or set
 capability is needed: folder access comes from the user's pick, not an
 entitlement.
 
-## Roadmap (build in this order)
+## Roadmap
 
-1. Entry detail sheet: meal amount, sleep/nap quality, sleep spans
-   (`endTimestamp`), and a note field. Long-press a quick button to open it.
-2. History beyond today: group entries by day; simple daily summary.
-3. Section 2, general info: a small set of editable docs
-   (`<folder>/info/<topic>.md` or `.json`), rarely edited, last-write-wins.
-4. Section 3, photos: image files under `<folder>/photos/`, with locally
-   generated thumbnails.
-5. Robustness: an `NSFilePresenter` on the entries folder for live updates,
-   per-file coordination, and moving file I/O off the main actor as volume
-   grows. Optional local-only cache (SwiftData, not synced) over the folder.
+Done: entry detail sheet, history by day, routines (markdown docs with inline
+media), three languages, weekly sharding, trash, per-entry audit log, and
+moving file I/O off the main actor with stamp-based incremental reloads.
+
+Next, roughly in order:
+
+1. `NSFilePresenter` on the folder for live updates, so another device's
+   change appears without a foreground refresh. The stamp diffing in
+   `FolderIO` is what this would drive.
+2. A way to see and restore what's in `.trash/` from inside the app.
+3. The offline translation pass that fills `translations` in entry notes and
+   routine sidecars.
+4. Optional local-only cache (persisted outside the shared folder, never in
+   it) to speed up cold launch.
 
 ## Code style
 
