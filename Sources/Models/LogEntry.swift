@@ -133,3 +133,48 @@ struct LogEntry: Codable, Identifiable, Hashable {
         try c.encode(edits, forKey: .edits)
     }
 }
+
+extension LogEntry {
+    /// End used for display and day overlap. An open sleep or nap counts as
+    /// running until now, capped at 24h so one that was never closed doesn't
+    /// spread across every following day.
+    var displayEnd: Date {
+        guard kind.hasDuration else { return timestamp }
+        if let endTimestamp { return endTimestamp }
+        return min(.now, timestamp.addingTimeInterval(24 * 3600))
+    }
+
+    /// True when the entry falls on, or spans into, the given day — so an
+    /// overnight sleep shows both the evening it starts and the morning it ends.
+    func occupies(_ day: Date, _ cal: Calendar = .current) -> Bool {
+        if cal.isDate(timestamp, inSameDayAs: day) { return true }
+        let start = cal.startOfDay(for: day)
+        guard let next = cal.date(byAdding: .day, value: 1, to: start) else { return false }
+        return timestamp < next && displayEnd > start
+    }
+
+    /// True when this row is the tail of something that began on an earlier day.
+    func continues(into day: Date, _ cal: Calendar = .current) -> Bool {
+        !cal.isDate(timestamp, inSameDayAs: day) && occupies(day, cal)
+    }
+
+    /// Where the entry sorts within one day: its start on the day it began,
+    /// otherwise when it ended (or the start of the day while still open).
+    func sortTime(on day: Date, _ cal: Calendar = .current) -> Date {
+        guard continues(into: day, cal) else { return timestamp }
+        if let endTimestamp, cal.isDate(endTimestamp, inSameDayAs: day) { return endTimestamp }
+        return cal.startOfDay(for: day)
+    }
+
+    /// Every day this entry should appear on.
+    func spannedDays(_ cal: Calendar = .current) -> [Date] {
+        var day = cal.startOfDay(for: timestamp)
+        let last = cal.startOfDay(for: displayEnd)
+        var result = [day]
+        while day < last, let next = cal.date(byAdding: .day, value: 1, to: day) {
+            result.append(next)
+            day = next
+        }
+        return result
+    }
+}

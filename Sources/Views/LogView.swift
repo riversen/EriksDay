@@ -4,7 +4,7 @@ struct LogView: View {
     @EnvironmentObject private var store: FolderStore
     @EnvironmentObject private var language: AppLanguage
 
-    @State private var editing: LogEntry?
+    @State private var editing: EditTarget?
     @State private var newEntry: LogEntry?
     @State private var selectedDay: Date = Calendar.current.startOfDay(for: .now)
 
@@ -16,14 +16,17 @@ struct LogView: View {
 
     private let cal = Calendar.current
 
-    /// Entries on the selected day (store keeps them newest-first).
+    /// Entries on the selected day, including sleep that spans into or out of
+    /// it, ordered by when each one happened *on this day*.
     private var dayEntries: [LogEntry] {
-        store.entries.filter { cal.isDate($0.timestamp, inSameDayAs: selectedDay) }
+        store.entries
+            .filter { $0.occupies(selectedDay, cal) }
+            .sorted { $0.sortTime(on: selectedDay, cal) > $1.sortTime(on: selectedDay, cal) }
     }
 
     /// Days that have at least one entry, for the strip's dots.
     private var daysWithEntries: Set<Date> {
-        Set(store.entries.map { cal.startOfDay(for: $0.timestamp) })
+        Set(store.entries.flatMap { $0.spannedDays(cal) })
     }
 
     /// A continuous run of days ending today, reaching back far enough to cover
@@ -49,9 +52,15 @@ struct LogView: View {
                 LazyVGrid(columns: columns, spacing: 8) {
                     ForEach(quickKinds) { kind in
                         Button {
-                            newEntry = LogEntry(kind: kind,
-                                                timestamp: newEntryDate(),
-                                                amount: kind.hasAmount ? .normal : nil)
+                            if kind == .wake, let open = openDurationEntry() {
+                                // Finish the sleep that's already running rather
+                                // than logging a second, disconnected event.
+                                editing = EditTarget(entry: open, prefillEnd: newEntryDate())
+                            } else {
+                                newEntry = LogEntry(kind: kind,
+                                                    timestamp: newEntryDate(),
+                                                    amount: kind.hasAmount ? .normal : nil)
+                            }
                         } label: {
                             VStack(spacing: 3) {
                                 Image(systemName: kind.symbol).font(.body)
@@ -78,8 +87,8 @@ struct LogView: View {
                         .foregroundStyle(.secondary)
                 } else {
                     ForEach(dayEntries) { entry in
-                        Button { editing = entry } label: {
-                            EntryRow(entry: entry)
+                        Button { editing = EditTarget(entry: entry, prefillEnd: nil) } label: {
+                            EntryRow(entry: entry, day: selectedDay)
                         }
                         .buttonStyle(.plain)
                     }
@@ -93,16 +102,18 @@ struct LogView: View {
         }
         .onAppear { store.ensureLoaded(weekOf: selectedDay) }
         .onChange(of: selectedDay) { _, day in store.ensureLoaded(weekOf: day) }
-        .sheet(item: $editing) { entry in
+        .sheet(item: $editing) { target in
             NavigationStack {
-                EntryEditor(entry: entry, isNew: false, uiLanguage: language.current,
+                EntryEditor(entry: target.entry, isNew: false, uiLanguage: language.current,
+                            prefillEnd: target.prefillEnd,
                             onSave: store.update,
-                            onDelete: { store.delete(entry) })
+                            onDelete: { store.delete(target.entry) })
             }
         }
         .sheet(item: $newEntry) { entry in
             NavigationStack {
                 EntryEditor(entry: entry, isNew: true, uiLanguage: language.current,
+                            prefillEnd: nil,
                             onSave: store.add,
                             onDelete: nil)
             }
@@ -116,6 +127,18 @@ struct LogView: View {
             .dateTime.weekday(.wide).day().month(.wide).locale(language.current.locale))
     }
 
+    /// The most recent sleep or nap still open within the last 24 hours — what
+    /// a Wake tap finishes instead of creating a separate entry. Nothing open
+    /// means Wake logs a plain wake event.
+    private func openDurationEntry() -> LogEntry? {
+        let now = newEntryDate()
+        let cutoff = now.addingTimeInterval(-24 * 3600)
+        return store.entries
+            .filter { $0.kind.hasDuration && $0.endTimestamp == nil
+                      && $0.timestamp <= now && $0.timestamp >= cutoff }
+            .max { $0.timestamp < $1.timestamp }
+    }
+
     /// New entries log the actual moment on today; on a past day they are
     /// back-filled at the current time-of-day so they land on that day.
     private func newEntryDate() -> Date {
@@ -125,6 +148,15 @@ struct LogView: View {
         return cal.date(bySettingHour: hm.hour ?? 12, minute: hm.minute ?? 0,
                         second: 0, of: selectedDay) ?? selectedDay
     }
+}
+
+/// What the editor sheet opens on. `prefillEnd` is set when a Wake tap is
+/// finishing an already-running sleep, so the editor opens with the wake time
+/// filled in.
+private struct EditTarget: Identifiable {
+    let entry: LogEntry
+    let prefillEnd: Date?
+    var id: UUID { entry.id }
 }
 
 /// Horizontally scrolling day picker, auto-scrolled to the selected day.
@@ -185,8 +217,12 @@ private struct DayCell: View {
 private struct EntryRow: View {
     @EnvironmentObject private var language: AppLanguage
     let entry: LogEntry
+    let day: Date
 
     private var s: Strings { language.s }
+
+    /// True when this is the tail of a sleep that began on an earlier day.
+    private var continued: Bool { entry.continues(into: day) }
 
     var body: some View {
         HStack(spacing: 12) {
@@ -195,6 +231,10 @@ private struct EntryRow: View {
                 .foregroundStyle(.secondary)
             VStack(alignment: .leading, spacing: 2) {
                 Text(s.kind(entry.kind))
+                if continued {
+                    Text("\(s.fromLabel) \(entry.timestamp.formatted(.dateTime.weekday(.abbreviated).hour().minute().locale(language.current.locale)))")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
                 if let amount = entry.amount {
                     Text(s.amount(amount)).font(.caption).foregroundStyle(.secondary)
                 }
@@ -215,11 +255,20 @@ private struct EntryRow: View {
 
     @ViewBuilder private var times: some View {
         VStack(alignment: .trailing, spacing: 2) {
-            Text(entry.timestamp, style: .time).monospacedDigit()
-            if let end = entry.endTimestamp {
-                Text(end, style: .time).font(.caption).monospacedDigit()
-            } else if entry.kind.hasDuration {
-                Text(s.ongoing).font(.caption2)
+            if continued {
+                // What happened on *this* day is the waking, so lead with it.
+                if let end = entry.endTimestamp {
+                    Text(end, style: .time).monospacedDigit()
+                } else {
+                    Text(s.ongoing).font(.caption2)
+                }
+            } else {
+                Text(entry.timestamp, style: .time).monospacedDigit()
+                if let end = entry.endTimestamp {
+                    Text(end, style: .time).font(.caption).monospacedDigit()
+                } else if entry.kind.hasDuration {
+                    Text(s.ongoing).font(.caption2)
+                }
             }
         }
         .foregroundStyle(.secondary)
@@ -274,6 +323,8 @@ private struct EntryEditor: View {
     @State private var amount: Amount
     @State private var moods: Set<Mood>
     @State private var noteText: String
+    @State private var addSleepStart = false
+    @State private var sleepStart: Date
 
     let isNew: Bool
     let uiLanguage: Language
@@ -281,14 +332,17 @@ private struct EntryEditor: View {
     let onDelete: (() -> Void)?
 
     init(entry: LogEntry, isNew: Bool, uiLanguage: Language,
+         prefillEnd: Date?,
          onSave: @escaping (LogEntry) -> Void,
          onDelete: (() -> Void)?) {
         _entry = State(initialValue: entry)
-        _hasEnd = State(initialValue: entry.endTimestamp != nil)
-        _endDate = State(initialValue: entry.endTimestamp ?? entry.timestamp)
+        _hasEnd = State(initialValue: entry.endTimestamp != nil || prefillEnd != nil)
+        _endDate = State(initialValue: entry.endTimestamp ?? prefillEnd ?? entry.timestamp)
         _amount = State(initialValue: entry.amount ?? .normal)
         _moods = State(initialValue: Set(entry.moods))
         _noteText = State(initialValue: entry.note.resolved(for: uiLanguage))
+        // Only a starting point; the caregiver adjusts it if they use it at all.
+        _sleepStart = State(initialValue: entry.timestamp.addingTimeInterval(-8 * 3600))
         self.isNew = isNew
         self.uiLanguage = uiLanguage
         self.onSave = onSave
@@ -312,6 +366,18 @@ private struct EntryEditor: View {
                         DatePicker(s.wokeUp, selection: $endDate,
                                    in: entry.timestamp...)
                     }
+                }
+            }
+
+            if kind == .wake {
+                Section {
+                    Toggle(s.addSleepStart, isOn: $addSleepStart.animation())
+                    if addSleepStart {
+                        DatePicker(s.fellAsleep, selection: $sleepStart,
+                                   in: ...entry.timestamp)
+                    }
+                } footer: {
+                    Text(s.addSleepStartHelp)
                 }
             }
 
@@ -388,6 +454,13 @@ private struct EntryEditor: View {
         // Only re-author the note (and invalidate translations) if it changed.
         if noteText != entry.note.resolved(for: uiLanguage) {
             e.note = noteText.isEmpty ? LocalizedText() : LocalizedText(noteText, language: uiLanguage)
+        }
+        // A wake with a known bedtime is really a sleep: recorded the same way
+        // as one logged at bedtime, so durations work out identically.
+        if kind == .wake, addSleepStart {
+            e.kind = .sleep
+            e.endTimestamp = e.timestamp
+            e.timestamp = sleepStart
         }
         onSave(e)
         dismiss()

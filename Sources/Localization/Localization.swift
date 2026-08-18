@@ -121,6 +121,15 @@ struct Strings {
     var notes: String { t("Notes", "Notater", "Notat") }
     var notesOptional: String { t("Notes (optional)", "Notater (valgfritt)", "Notat (valfritt)") }
     var history: String { t("History", "Historikk", "Historikk") }
+    var addSleepStart: String {
+        t("Add when he fell asleep", "Legg til når han sovnet", "Legg til når han sovna")
+    }
+    var addSleepStartHelp: String {
+        t("Saves this as a sleep entry with a start and end time. Leave off if you don't know.",
+          "Lagres som en søvnoppføring med start- og sluttid. La stå av hvis du ikke vet.",
+          "Blir lagra som ei søvnoppføring med start- og sluttid. La stå av om du ikkje veit.")
+    }
+    var fromLabel: String { t("From", "Fra", "Frå") }
     var cancel: String { t("Cancel", "Avbryt", "Avbryt") }
     var add: String { t("Add", "Legg til", "Legg til") }
     var save: String { t("Save", "Lagre", "Lagre") }

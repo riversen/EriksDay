@@ -146,14 +146,18 @@ final class FolderStore: ObservableObject {
     /// moves to days that aren't in memory yet.
     func ensureLoaded(weekOf date: Date) {
         guard let io else { return }
-        let key = WeekKey.key(for: date)
-        guard !loadedWeeks.contains(key), knownWeeks.contains(key) else { return }
-        loadedWeeks.insert(key)     // claim it now so we don't queue it twice
-        Task {
-            let result = await io.loadWeek(key, reusing: WeekSnapshot())
-            applyWeek(key, result.value)
-            if let error = result.error { lastError = error }
-            rebuildEntries()
+        // Also the previous day's week: an overnight sleep is filed under the
+        // week it began, which can be the week before the day being viewed.
+        let previous = Calendar.current.date(byAdding: .day, value: -1, to: date) ?? date
+        for key in Set([WeekKey.key(for: date), WeekKey.key(for: previous)]) {
+            guard !loadedWeeks.contains(key), knownWeeks.contains(key) else { continue }
+            loadedWeeks.insert(key)     // claim it now so we don't queue it twice
+            Task {
+                let result = await io.loadWeek(key, reusing: WeekSnapshot())
+                applyWeek(key, result.value)
+                if let error = result.error { lastError = error }
+                rebuildEntries()
+            }
         }
     }
 
@@ -324,7 +328,15 @@ extension FolderStore {
             func at(_ h: Int, _ m: Int) -> Date {
                 Calendar.current.date(bySettingHour: h, minute: m, second: 0, of: .now) ?? .now
             }
-            add(LogEntry(kind: .wake, timestamp: at(7, 30)))
+            // Overnight sleep: starts the evening before and ends this
+            // morning, so it appears on both days.
+            let cal = Calendar.current
+            let yesterday = cal.date(byAdding: .day, value: -1, to: .now) ?? .now
+            add(LogEntry(kind: .sleep,
+                         timestamp: cal.date(bySettingHour: 21, minute: 45, second: 0,
+                                             of: yesterday) ?? yesterday,
+                         endTimestamp: at(7, 30),
+                         note: "Settled quickly", noteLanguage: .en))
             add(LogEntry(kind: .meal, timestamp: at(8, 0), amount: .normal,
                          note: "Oatmeal and banana", noteLanguage: .en))
             add(LogEntry(kind: .urine, timestamp: at(9, 10)))
