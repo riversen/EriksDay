@@ -13,11 +13,14 @@ final class AppLock: ObservableObject {
     enum State: Equatable {
         case locked
         case unlocked
-        /// The device has no passcode, so there is nothing to authenticate against.
-        case noDevicePasscode
     }
 
     @Published private(set) var state: State
+    /// False when the device has no passcode or biometrics. iOS file
+    /// protection is already inert without a device passcode, so refusing to
+    /// open would protect nothing — the app opens and says so in Settings
+    /// instead. Enforcing a passcode is an MDM concern, not an app one.
+    @Published private(set) var isSupported: Bool
     @Published var isEnabled: Bool {
         didSet {
             guard oldValue != isEnabled else { return }
@@ -43,7 +46,11 @@ final class AppLock: ObservableObject {
         if ProcessInfo.processInfo.arguments.contains("-demoData") { enabled = false }
         #endif
         isEnabled = enabled
-        state = enabled ? .locked : .unlocked
+        var capabilityError: NSError?
+        let supported = LAContext().canEvaluatePolicy(.deviceOwnerAuthentication,
+                                                      error: &capabilityError)
+        isSupported = supported
+        state = (enabled && supported) ? .locked : .unlocked
     }
 
     var isUnlocked: Bool { state == .unlocked }
@@ -53,7 +60,7 @@ final class AppLock: ObservableObject {
     }
 
     func didBecomeActive(reason: String) {
-        guard isEnabled else {
+        guard isEnabled, refreshSupport() else {
             state = .unlocked
             return
         }
@@ -66,23 +73,39 @@ final class AppLock: ObservableObject {
     }
 
     func authenticate(reason: String) {
-        guard isEnabled else {
+        guard isEnabled, refreshSupport() else {
             state = .unlocked
             return
         }
         let context = LAContext()
-        var error: NSError?
-        // Falls back to the passcode, and reports unavailable when the device
-        // has none — the case worth refusing.
-        guard context.canEvaluatePolicy(.deviceOwnerAuthentication, error: &error) else {
-            state = .noDevicePasscode
-            return
-        }
-        context.evaluatePolicy(.deviceOwnerAuthentication, localizedReason: reason) { success, _ in
+        context.evaluatePolicy(.deviceOwnerAuthentication, localizedReason: reason) { success, error in
             Task { @MainActor in
-                self.state = success ? .unlocked : .locked
-                if success { self.leftAt = nil }
+                if success {
+                    self.state = .unlocked
+                    self.leftAt = nil
+                    return
+                }
+                // Belt and braces: some platforms report the capability but
+                // then fail because there is nothing to authenticate against.
+                // Treat that like an unsupported device rather than locking
+                // the user out of their own care log.
+                if let code = (error as? LAError)?.code,
+                   code == .passcodeNotSet || code == .biometryNotAvailable {
+                    self.isSupported = false
+                    self.state = .unlocked
+                } else {
+                    self.state = .locked
+                }
             }
         }
+    }
+
+    /// Whether the device can authenticate its owner at all.
+    @discardableResult
+    private func refreshSupport() -> Bool {
+        var error: NSError?
+        let ok = LAContext().canEvaluatePolicy(.deviceOwnerAuthentication, error: &error)
+        isSupported = ok
+        return ok
     }
 }

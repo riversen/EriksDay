@@ -152,6 +152,9 @@ struct Strings {
           "Denne eininga har ingen kode. Vel ein kode i Innstillingar for å verne opplysningane i Erik's Day.")
     }
     var openSettings: String { t("Open Settings", "Åpne Innstillinger", "Opne Innstillingar") }
+    var lockInactive: String {
+        t("Not active on this device", "Ikke aktiv på denne enheten", "Ikkje aktiv på denne eininga")
+    }
     var folderLabel: String { t("Folder", "Mappe", "Mappe") }
     var thisDevice: String { t("This device", "Denne enheten", "Denne eininga") }
     var cancel: String { t("Cancel", "Avbryt", "Avbryt") }

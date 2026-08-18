@@ -45,7 +45,6 @@ private struct PrivacyCover: View {
 private struct LockScreen: View {
     @EnvironmentObject private var language: AppLanguage
     @EnvironmentObject private var lock: AppLock
-    @Environment(\.openURL) private var openURL
 
     private var s: Strings { language.s }
 
@@ -58,26 +57,9 @@ private struct LockScreen: View {
                     .frame(width: 72, height: 72)
                     .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
 
-                switch lock.state {
-                case .noDevicePasscode:
-                    Image(systemName: "exclamationmark.lock").font(.title)
-                    Text(s.passcodeNeeded)
-                        .multilineTextAlignment(.center)
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, 32)
-                    Button(s.openSettings) {
-                        if let url = URL(string: UIApplication.openSettingsURLString) {
-                            openURL(url)
-                        }
-                    }
+                Text(s.appLocked).font(.headline)
+                Button(s.unlock) { lock.authenticate(reason: s.unlockReason) }
                     .buttonStyle(.borderedProminent)
-                    Button(s.unlock) { lock.authenticate(reason: s.unlockReason) }
-
-                default:
-                    Text(s.appLocked).font(.headline)
-                    Button(s.unlock) { lock.authenticate(reason: s.unlockReason) }
-                        .buttonStyle(.borderedProminent)
-                }
             }
         }
         .transition(.opacity)
@@ -92,6 +74,7 @@ struct SettingsView: View {
     @EnvironmentObject private var lock: AppLock
     @EnvironmentObject private var store: FolderStore
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.openURL) private var openURL
 
     private var s: Strings { language.s }
 
@@ -100,10 +83,20 @@ struct SettingsView: View {
             Form {
                 Section {
                     Toggle(s.requireUnlock, isOn: $lock.isEnabled)
+                    if !lock.isSupported {
+                        // Never a silent downgrade: say why the lock can't apply.
+                        Label(s.lockInactive, systemImage: "exclamationmark.triangle")
+                            .foregroundStyle(.secondary)
+                        Button(s.openSettings) {
+                            if let url = URL(string: UIApplication.openSettingsURLString) {
+                                openURL(url)
+                            }
+                        }
+                    }
                 } header: {
                     Text(s.security)
                 } footer: {
-                    Text(s.requireUnlockHelp)
+                    Text(lock.isSupported ? s.requireUnlockHelp : s.passcodeNeeded)
                 }
 
                 if let folder = store.folderName {
