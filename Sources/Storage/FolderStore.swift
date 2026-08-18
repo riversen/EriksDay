@@ -1,13 +1,17 @@
 import Foundation
 import UIKit
 
-/// Reads and writes data as discrete files inside a user-selected folder
-/// (intended to be a shared iCloud Drive folder). One file per entry keeps
-/// writers from colliding; log entries are sharded into per-week subfolders so
-/// not everything has to be loaded at once.
+/// In-memory model over the user-selected shared folder (intended to be a
+/// shared iCloud Drive folder). All file access happens in `FolderIO`, off the
+/// main actor; this type holds the cache the UI reads.
 ///
-/// IMPORTANT: never put a SwiftData/Core Data/SQLite store in this folder.
-/// Discrete files only.
+/// Reloads diff by file stamp and reuse everything unchanged, so returning to
+/// the app doesn't re-read (and possibly re-download) files it already has.
+/// Writes update memory first and persist in the background, so tapping a
+/// button never waits on iCloud.
+///
+/// IMPORTANT: never put a SwiftData/Core Data/SQLite store in the shared
+/// folder. Discrete files only.
 @MainActor
 final class FolderStore: ObservableObject {
     @Published private(set) var entries: [LogEntry] = []
@@ -17,11 +21,20 @@ final class FolderStore: ObservableObject {
 
     private let bookmarkKey = "eriksDayFolderBookmark"
     private var folderURL: URL?
+    private var io: FolderIO?
 
     /// Per-week cache so weeks load independently and on demand.
-    private var entriesByWeek: [String: [LogEntry]] = [:]
+    private var weeks: [String: WeekSnapshot] = [:]
     private var loadedWeeks: Set<String> = []
     private var knownWeeks: Set<String> = []
+    private var routineSnapshot = RoutineSnapshot()
+
+    /// Local changes not yet confirmed on disk. A reload that was already in
+    /// flight must not revert them, so they're re-applied over its result.
+    private var pendingEntries: [UUID: LogEntry] = [:]
+    private var pendingEntryDeletes: Set<UUID> = []
+    private var pendingRoutines: [UUID: RoutineDoc] = [:]
+    private var pendingRoutineDeletes: Set<UUID> = []
 
     /// Label written into each edit record — "which device". iOS 16+ returns a
     /// generic model for `UIDevice.name`, so a vendor-id suffix disambiguates.
@@ -49,6 +62,16 @@ final class FolderStore: ObservableObject {
 
     // MARK: - Folder selection
 
+    private func attach(_ url: URL, name: String) {
+        folderURL = url
+        folderName = name
+        io = FolderIO(root: url)
+        weeks = [:]
+        loadedWeeks = []
+        knownWeeks = []
+        routineSnapshot = RoutineSnapshot()
+    }
+
     func setFolder(_ url: URL) {
         let access = url.startAccessingSecurityScopedResource()
         defer { if access { url.stopAccessingSecurityScopedResource() } }
@@ -57,9 +80,7 @@ final class FolderStore: ObservableObject {
                                                 includingResourceValuesForKeys: nil,
                                                 relativeTo: nil)
             UserDefaults.standard.set(bookmark, forKey: bookmarkKey)
-            folderURL = url
-            folderName = url.lastPathComponent
-            try ensureSubfolders()
+            attach(url, name: url.lastPathComponent)
             reloadAll()
         } catch {
             lastError = "Couldn't save access to that folder: \(error.localizedDescription)"
@@ -72,64 +93,109 @@ final class FolderStore: ObservableObject {
         do {
             let url = try URL(resolvingBookmarkData: data, options: [],
                               relativeTo: nil, bookmarkDataIsStale: &stale)
-            folderURL = url
-            folderName = url.lastPathComponent
-            if stale { setFolder(url) } else { reloadAll() }
+            if stale {
+                setFolder(url)
+            } else {
+                attach(url, name: url.lastPathComponent)
+                reloadAll()
+            }
         } catch {
             lastError = "Lost access to the folder. Please choose it again."
             UserDefaults.standard.removeObject(forKey: bookmarkKey)
             folderURL = nil
             folderName = nil
+            io = nil
         }
     }
 
-    // MARK: - Folder layout
-
-    private var entriesURL: URL? { folderURL?.appendingPathComponent("entries", isDirectory: true) }
-    private var routinesURL: URL? { folderURL?.appendingPathComponent("routines", isDirectory: true) }
-    private var mediaURL: URL? { routinesURL?.appendingPathComponent("media", isDirectory: true) }
-    private var trashURL: URL? { folderURL?.appendingPathComponent(".trash", isDirectory: true) }
-
-    private func ensureSubfolders() throws {
-        let fm = FileManager.default
-        if let entriesURL { try fm.createDirectory(at: entriesURL, withIntermediateDirectories: true) }
-        if let routinesURL { try fm.createDirectory(at: routinesURL, withIntermediateDirectories: true) }
-        if let mediaURL { try fm.createDirectory(at: mediaURL, withIntermediateDirectories: true) }
-    }
-
-    private func weekFolderURL(for date: Date) -> URL? {
-        entriesURL?.appendingPathComponent(weekKey(for: date), isDirectory: true)
-    }
-
-    /// ISO-8601 week key like `2026-W24`.
-    private func weekKey(for date: Date) -> String {
-        let cal = Calendar(identifier: .iso8601)
-        let c = cal.dateComponents([.yearForWeekOfYear, .weekOfYear], from: date)
-        return String(format: "%04d-W%02d", c.yearForWeekOfYear ?? 0, c.weekOfYear ?? 0)
-    }
-
-    private func startDate(forWeekKey key: String) -> Date? {
-        let parts = key.split(separator: "-")
-        guard parts.count == 2, parts[1].hasPrefix("W"),
-              let year = Int(parts[0]), let week = Int(parts[1].dropFirst()) else { return nil }
-        let cal = Calendar(identifier: .iso8601)
-        var comps = DateComponents()
-        comps.yearForWeekOfYear = year
-        comps.weekOfYear = week
-        comps.weekday = cal.firstWeekday
-        return cal.date(from: comps)
-    }
-
-    private func withFolderAccess<T>(_ body: () -> T) -> T {
-        let access = folderURL?.startAccessingSecurityScopedResource() ?? false
-        defer { if access { folderURL?.stopAccessingSecurityScopedResource() } }
-        return body()
-    }
-
-    /// The earliest day that has any entry, from the week folder names (cheap —
-    /// no file contents read). Drives how far back the day browser reaches.
+    /// The earliest day that has any entry, from week folder names alone.
+    /// Drives how far back the day browser reaches without loading contents.
     var earliestEntryDate: Date? {
-        knownWeeks.sorted().first.flatMap { startDate(forWeekKey: $0) }
+        knownWeeks.sorted().first.flatMap { WeekKey.startDate(for: $0) }
+    }
+
+    // MARK: - Reloading
+
+    func reloadAll() {
+        Task { await refresh() }
+    }
+
+    /// Reload the weeks currently in play plus the recent ones, reusing
+    /// everything whose file stamp is unchanged.
+    func refresh() async {
+        guard let io else { return }
+        await io.prepare()
+        let keys = await io.weekKeys()
+        knownWeeks = keys
+
+        let targets = loadedWeeks.union(recentWeekKeys()).intersection(keys)
+        for key in targets {
+            let result = await io.loadWeek(key, reusing: weeks[key] ?? WeekSnapshot())
+            applyWeek(key, result.value)
+            if let error = result.error { lastError = error }
+        }
+
+        let routineResult = await io.loadRoutines(reusing: routineSnapshot)
+        applyRoutines(routineResult.value)
+        if let error = routineResult.error { lastError = error }
+
+        rebuildEntries()
+    }
+
+    /// Ensure the week containing `date` is loaded — called as the day browser
+    /// moves to days that aren't in memory yet.
+    func ensureLoaded(weekOf date: Date) {
+        guard let io else { return }
+        let key = WeekKey.key(for: date)
+        guard !loadedWeeks.contains(key), knownWeeks.contains(key) else { return }
+        loadedWeeks.insert(key)     // claim it now so we don't queue it twice
+        Task {
+            let result = await io.loadWeek(key, reusing: WeekSnapshot())
+            applyWeek(key, result.value)
+            if let error = result.error { lastError = error }
+            rebuildEntries()
+        }
+    }
+
+    private func recentWeekKeys(daysBack: Int = 14) -> Set<String> {
+        let cal = Calendar.current
+        var keys: Set<String> = []
+        for offset in 0...daysBack {
+            if let d = cal.date(byAdding: .day, value: -offset, to: .now) {
+                keys.insert(WeekKey.key(for: d))
+            }
+        }
+        return keys
+    }
+
+    /// Store a freshly loaded week, keeping any local change still in flight.
+    private func applyWeek(_ key: String, _ snapshot: WeekSnapshot) {
+        var snapshot = snapshot
+        for (id, entry) in pendingEntries where WeekKey.key(for: entry.timestamp) == key {
+            snapshot.entries["\(id.uuidString).json"] = entry
+        }
+        for id in pendingEntryDeletes {
+            snapshot.entries.removeValue(forKey: "\(id.uuidString).json")
+        }
+        weeks[key] = snapshot
+        loadedWeeks.insert(key)
+    }
+
+    private func applyRoutines(_ snapshot: RoutineSnapshot) {
+        routineSnapshot = snapshot
+        var docs = snapshot.items.values.map(\.doc)
+        for (id, doc) in pendingRoutines where !docs.contains(where: { $0.id == id }) {
+            docs.append(doc)
+        }
+        docs = docs.map { pendingRoutines[$0.id] ?? $0 }
+            .filter { !pendingRoutineDeletes.contains($0.id) }
+        routines = docs.sorted { $0.updatedAt > $1.updatedAt }
+    }
+
+    private func rebuildEntries() {
+        entries = loadedWeeks
+            .flatMap { weeks[$0]?.entries.values.map { $0 } ?? [] }
+            .sorted { $0.timestamp > $1.timestamp }
     }
 
     // MARK: - Log entries
@@ -138,288 +204,107 @@ final class FolderStore: ObservableObject {
     func update(_ entry: LogEntry) { save(entry) }
 
     private func save(_ entry: LogEntry) {
-        guard hasFolder, entriesURL != nil else {
+        guard let io else {
             lastError = "No folder selected yet."
             return
         }
         var e = entry
         e.edits.append(EditRecord(device: deviceName, date: .now))
 
-        withFolderAccess {
-            refreshKnownWeeksLocked()
-            removeEntryFilesEverywhereLocked(id: e.id)       // drop any stale (e.g. week changed)
-            guard let folder = weekFolderURL(for: e.timestamp) else { return }
-            try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-            let fileURL = folder.appendingPathComponent("\(e.id.uuidString).json")
-            coordinatedWrite(to: fileURL) { url in
-                try JSONEncoder.eriksDay.encode(e).write(to: url, options: .atomic)
-            }
-        }
-        refreshKnownWeeks()
-        let key = weekKey(for: e.timestamp)
-        loadedWeeks.remove(key)
-        loadWeek(key)
+        // Reflect it immediately; the disk write happens in the background.
+        let key = WeekKey.key(for: e.timestamp)
+        let name = "\(e.id.uuidString).json"
+        removeFromMemory(id: e.id)
+        var snapshot = weeks[key] ?? WeekSnapshot()
+        snapshot.entries[name] = e
+        weeks[key] = snapshot
+        loadedWeeks.insert(key)
+        knownWeeks.insert(key)
+        pendingEntries[e.id] = e
+        pendingEntryDeletes.remove(e.id)
         rebuildEntries()
+
+        let sweep = knownWeeks
+        Task {
+            let result = await io.write(e, clearingFrom: sweep)
+            if let stamp = result.value {
+                // Record the stamp so the next reload treats it as unchanged.
+                weeks[key]?.stamps[name] = stamp
+            }
+            if let error = result.error { lastError = error }
+            if pendingEntries[e.id]?.edits.count == e.edits.count { pendingEntries[e.id] = nil }
+        }
     }
 
     func delete(_ entry: LogEntry) {
-        guard hasFolder else { return }
-        withFolderAccess {
-            guard let src = weekFolderURL(for: entry.timestamp)?
-                .appendingPathComponent("\(entry.id.uuidString).json") else { return }
-            moveToTrash(src, subfolder: "entries")
-        }
-        let key = weekKey(for: entry.timestamp)
-        loadedWeeks.remove(key)
-        loadWeek(key)
+        guard let io else { return }
+        let key = WeekKey.key(for: entry.timestamp)
+        removeFromMemory(id: entry.id)
+        pendingEntries[entry.id] = nil
+        pendingEntryDeletes.insert(entry.id)
         rebuildEntries()
-    }
 
-    /// Ensure the week containing `date` is loaded (called as the day browser
-    /// moves to older days).
-    func ensureLoaded(weekOf date: Date) {
-        let key = weekKey(for: date)
-        guard !loadedWeeks.contains(key), knownWeeks.contains(key) else { return }
-        loadWeek(key)
-        rebuildEntries()
-    }
-
-    func reloadAll() {
-        guard hasFolder else { return }
-        // Folders picked by an earlier build won't have the routines/ subfolder
-        // yet; create any missing subfolders before reading or writing.
-        withFolderAccess { try? ensureSubfolders() }
-        migrateLooseEntries()
-        refreshKnownWeeks()
-        let target = loadedWeeks.union(recentWeekKeys()).intersection(knownWeeks)
-        entriesByWeek = [:]
-        loadedWeeks = []
-        for key in target { loadWeek(key) }
-        rebuildEntries()
-        reloadRoutines()
-    }
-
-    private func recentWeekKeys(daysBack: Int = 14) -> Set<String> {
-        let cal = Calendar.current
-        var keys: Set<String> = []
-        for offset in 0...daysBack {
-            if let d = cal.date(byAdding: .day, value: -offset, to: .now) {
-                keys.insert(weekKey(for: d))
-            }
-        }
-        return keys
-    }
-
-    private func loadWeek(_ key: String) {
-        guard let dir = entriesURL?.appendingPathComponent(key, isDirectory: true) else { return }
-        var loaded: [LogEntry] = []
-        withFolderAccess {
-            var coordError: NSError?
-            NSFileCoordinator().coordinate(readingItemAt: dir, options: [], error: &coordError) { d in
-                let urls = (try? FileManager.default.contentsOfDirectory(at: d, includingPropertiesForKeys: nil)) ?? []
-                for url in urls where url.pathExtension == "json" {
-                    guard let data = try? Data(contentsOf: url),
-                          let e = try? JSONDecoder.eriksDay.decode(LogEntry.self, from: data) else { continue }
-                    loaded.append(e)
-                }
-            }
-            if let coordError { lastError = coordError.localizedDescription }
-        }
-        entriesByWeek[key] = loaded
-        loadedWeeks.insert(key)
-    }
-
-    private func rebuildEntries() {
-        entries = loadedWeeks.flatMap { entriesByWeek[$0] ?? [] }
-            .sorted { $0.timestamp > $1.timestamp }
-    }
-
-    private func refreshKnownWeeks() {
-        knownWeeks = Set(withFolderAccess { availableWeekKeysLocked() })
-    }
-
-    /// Assumes folder access is already held.
-    private func refreshKnownWeeksLocked() {
-        knownWeeks = Set(availableWeekKeysLocked())
-    }
-
-    private func availableWeekKeysLocked() -> [String] {
-        guard let entriesURL else { return [] }
-        let urls = (try? FileManager.default.contentsOfDirectory(
-            at: entriesURL, includingPropertiesForKeys: [.isDirectoryKey])) ?? []
-        return urls
-            .filter { ((try? $0.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory) == true }
-            .map { $0.lastPathComponent }
-    }
-
-    /// Move any pre-sharding `entries/*.json` files into their week subfolder.
-    private func migrateLooseEntries() {
-        withFolderAccess {
-            guard let entriesURL else { return }
-            let urls = (try? FileManager.default.contentsOfDirectory(at: entriesURL, includingPropertiesForKeys: nil)) ?? []
-            for url in urls where url.pathExtension == "json" {
-                guard let data = try? Data(contentsOf: url),
-                      let entry = try? JSONDecoder.eriksDay.decode(LogEntry.self, from: data),
-                      let folder = weekFolderURL(for: entry.timestamp) else { continue }
-                try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-                try? FileManager.default.moveItem(at: url, to: folder.appendingPathComponent(url.lastPathComponent))
-            }
+        Task {
+            if let error = await io.trashEntry(id: entry.id, weekKey: key) { lastError = error }
+            pendingEntryDeletes.remove(entry.id)
         }
     }
 
-    /// Assumes folder access is held. Removes any copy of an entry across weeks
-    /// (used before rewriting, e.g. when an edit moved it to another week).
-    private func removeEntryFilesEverywhereLocked(id: UUID) {
-        guard let entriesURL else { return }
-        for key in knownWeeks {
-            let f = entriesURL.appendingPathComponent(key, isDirectory: true)
-                .appendingPathComponent("\(id.uuidString).json")
-            if FileManager.default.fileExists(atPath: f.path) {
-                try? FileManager.default.removeItem(at: f)
-            }
+    /// Drop an entry from every week it might be cached under (an edited time
+    /// can move it between weeks).
+    private func removeFromMemory(id: UUID) {
+        let name = "\(id.uuidString).json"
+        for key in weeks.keys {
+            weeks[key]?.entries.removeValue(forKey: name)
+            weeks[key]?.stamps.removeValue(forKey: name)
         }
     }
 
-    // MARK: - Routines (markdown docs + media)
+    // MARK: - Routines
 
     func saveRoutine(_ doc: RoutineDoc) {
-        guard hasFolder, let routinesURL else {
+        guard let io else {
             lastError = "No folder selected yet."
             return
         }
         var d = doc
         d.edits.append(EditRecord(device: deviceName, date: .now))
-        withFolderAccess {
-            try? FileManager.default.createDirectory(at: routinesURL, withIntermediateDirectories: true)
-            let mdURL = routineFileURL(in: routinesURL, id: d.id, ext: "md")
-            coordinatedWrite(to: mdURL) { url in
-                try d.body.data(using: .utf8)?.write(to: url, options: .atomic)
-            }
-            let metaURL = routineFileURL(in: routinesURL, id: d.id, ext: "json")
-            let meta = RoutineMeta(edits: d.edits, sourceLanguage: d.sourceLanguage, translations: d.translations)
-            coordinatedWrite(to: metaURL) { url in
-                try JSONEncoder.eriksDay.encode(meta).write(to: url, options: .atomic)
-            }
+        d.updatedAt = .now
+
+        pendingRoutines[d.id] = d
+        pendingRoutineDeletes.remove(d.id)
+        applyRoutines(routineSnapshot)
+
+        Task {
+            if let error = await io.writeRoutine(d) { lastError = error }
+            let result = await io.loadRoutines(reusing: RoutineSnapshot())
+            if pendingRoutines[d.id]?.edits.count == d.edits.count { pendingRoutines[d.id] = nil }
+            applyRoutines(result.value)
         }
-        reloadRoutines()
     }
 
     func deleteRoutine(_ doc: RoutineDoc) {
-        guard hasFolder, let routinesURL else { return }
-        withFolderAccess {
-            moveToTrash(routineFileURL(in: routinesURL, id: doc.id, ext: "md"), subfolder: "routines")
-            moveToTrash(routineFileURL(in: routinesURL, id: doc.id, ext: "json"), subfolder: "routines")
-        }
-        reloadRoutines()
-    }
+        guard let io else { return }
+        pendingRoutines[doc.id] = nil
+        pendingRoutineDeletes.insert(doc.id)
+        applyRoutines(routineSnapshot)
 
-    /// On-disk URL for a routine file (`<uuid>.<ext>`), matched
-    /// case-insensitively so externally-generated lowercase UUID names resolve
-    /// on case-sensitive filesystems (every iOS device). Editing then
-    /// overwrites the existing file instead of creating an uppercase duplicate,
-    /// and deleting finds it. Falls back to the canonical (uppercase
-    /// `id.uuidString`) name when no file exists yet, i.e. for new docs.
-    private func routineFileURL(in routinesURL: URL, id: UUID, ext: String) -> URL {
-        if let urls = try? FileManager.default.contentsOfDirectory(
-            at: routinesURL, includingPropertiesForKeys: nil),
-           let match = urls.first(where: {
-               $0.pathExtension == ext &&
-               $0.deletingPathExtension().lastPathComponent
-                   .caseInsensitiveCompare(id.uuidString) == .orderedSame
-           }) {
-            return match
-        }
-        return routinesURL.appendingPathComponent("\(id.uuidString).\(ext)")
-    }
-
-    /// Copy attached media into `routines/media/` and return the routines-
-    /// relative path (e.g. `media/<uuid>.jpg`). Copying means we never depend
-    /// on the original device's photo library.
-    func saveMedia(_ data: Data, ext: String) -> String? {
-        guard hasFolder, let mediaURL else { return nil }
-        let name = "\(UUID().uuidString).\(ext)"
-        var ok = false
-        withFolderAccess {
-            try? FileManager.default.createDirectory(at: mediaURL, withIntermediateDirectories: true)
-            coordinatedWrite(to: mediaURL.appendingPathComponent(name)) { url in
-                try data.write(to: url, options: .atomic)
-                ok = true
-            }
-        }
-        return ok ? "media/\(name)" : nil
-    }
-
-    func mediaData(_ relativePath: String) -> Data? {
-        guard hasFolder, let routinesURL else { return nil }
-        return withFolderAccess {
-            let fileURL = routinesURL.appendingPathComponent(relativePath)
-            var data: Data?
-            var coordError: NSError?
-            NSFileCoordinator().coordinate(readingItemAt: fileURL, options: [], error: &coordError) { url in
-                data = try? Data(contentsOf: url)
-            }
-            return data
+        Task {
+            if let error = await io.trashRoutine(id: doc.id) { lastError = error }
+            let result = await io.loadRoutines(reusing: RoutineSnapshot())
+            pendingRoutineDeletes.remove(doc.id)
+            applyRoutines(result.value)
         }
     }
 
-    func reloadRoutines() {
-        guard hasFolder, let routinesURL else { return }
-        var loaded: [RoutineDoc] = []
-        withFolderAccess {
-            var coordError: NSError?
-            NSFileCoordinator().coordinate(readingItemAt: routinesURL, options: [], error: &coordError) { dir in
-                let urls = (try? FileManager.default.contentsOfDirectory(
-                    at: dir, includingPropertiesForKeys: [.contentModificationDateKey])) ?? []
-                for url in urls where url.pathExtension == "md" {
-                    guard let id = UUID(uuidString: url.deletingPathExtension().lastPathComponent),
-                          let data = try? Data(contentsOf: url) else { continue }
-                    let body = String(data: data, encoding: .utf8) ?? ""
-                    let modified = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?
-                        .contentModificationDate ?? .distantPast
-                    // Derive the sidecar path from the md file's actual name,
-                    // not `id.uuidString` (which is uppercase) — externally
-                    // generated files use lowercase UUIDs, and the lookup must
-                    // match on case-sensitive filesystems (every iOS device).
-                    let metaURL = url.deletingPathExtension().appendingPathExtension("json")
-                    let meta = (try? Data(contentsOf: metaURL))
-                        .flatMap { try? JSONDecoder.eriksDay.decode(RoutineMeta.self, from: $0) }
-                    loaded.append(RoutineDoc(id: id, body: body, updatedAt: modified,
-                                             edits: meta?.edits ?? [],
-                                             sourceLanguage: meta?.sourceLanguage,
-                                             translations: meta?.translations ?? [:]))
-                }
-            }
-            if let coordError { lastError = coordError.localizedDescription }
-        }
-        routines = loaded.sorted { $0.updatedAt > $1.updatedAt }
+    func saveMedia(_ data: Data, ext: String) async -> String? {
+        guard let io else { return nil }
+        return await io.saveMedia(data, ext: ext)
     }
 
-    // MARK: - Trash & coordinated writes
-
-    /// Move a file into the hidden `.trash/<subfolder>/` rather than deleting.
-    /// Assumes folder access is held.
-    private func moveToTrash(_ src: URL, subfolder: String) {
-        guard let trashURL, FileManager.default.fileExists(atPath: src.path) else { return }
-        let destDir = trashURL.appendingPathComponent(subfolder, isDirectory: true)
-        try? FileManager.default.createDirectory(at: destDir, withIntermediateDirectories: true)
-        let dest = destDir.appendingPathComponent("\(UUID().uuidString.prefix(8))-\(src.lastPathComponent)")
-        var coordError: NSError?
-        NSFileCoordinator().coordinate(writingItemAt: src, options: .forMoving,
-                                       writingItemAt: dest, options: .forReplacing,
-                                       error: &coordError) { s, d in
-            try? FileManager.default.moveItem(at: s, to: d)
-        }
-        if let coordError { lastError = coordError.localizedDescription }
-    }
-
-    /// Assumes folder access is held by the caller.
-    private func coordinatedWrite(to url: URL, _ body: (URL) throws -> Void) {
-        var coordError: NSError?
-        NSFileCoordinator().coordinate(writingItemAt: url, options: .forReplacing, error: &coordError) { coordinated in
-            do { try body(coordinated) }
-            catch { lastError = "Write failed: \(error.localizedDescription)" }
-        }
-        if let coordError { lastError = coordError.localizedDescription }
+    func mediaData(_ relativePath: String) async -> Data? {
+        guard let io else { return nil }
+        return await io.mediaData(relativePath)
     }
 }
 
@@ -430,51 +315,54 @@ extension FolderStore {
     func loadDemoDataIfRequested() {
         guard ProcessInfo.processInfo.arguments.contains("-demoData") else { return }
         let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        folderURL = docs.appendingPathComponent("DemoFolder", isDirectory: true)
-        folderName = "Family"
-        try? ensureSubfolders()
-        reloadAll()
-        guard entries.isEmpty, routines.isEmpty else { return }
+        attach(docs.appendingPathComponent("DemoFolder", isDirectory: true), name: "Family")
 
-        func at(_ h: Int, _ m: Int) -> Date {
-            Calendar.current.date(bySettingHour: h, minute: m, second: 0, of: .now) ?? .now
+        Task {
+            await refresh()
+            guard entries.isEmpty, routines.isEmpty else { return }
+
+            func at(_ h: Int, _ m: Int) -> Date {
+                Calendar.current.date(bySettingHour: h, minute: m, second: 0, of: .now) ?? .now
+            }
+            add(LogEntry(kind: .wake, timestamp: at(7, 30)))
+            add(LogEntry(kind: .meal, timestamp: at(8, 0), amount: .normal,
+                         note: "Oatmeal and banana", noteLanguage: .en))
+            add(LogEntry(kind: .urine, timestamp: at(9, 10)))
+            add(LogEntry(kind: .mood, timestamp: at(9, 30), moods: [.happy, .energetic]))
+            add(LogEntry(kind: .nap, timestamp: at(12, 30), endTimestamp: at(13, 15)))
+            add(LogEntry(kind: .meal, timestamp: at(15, 0), amount: .little,
+                         note: "Apple slices", noteLanguage: .en))
+            add(LogEntry(kind: .note, timestamp: at(16, 20),
+                         note: "Great afternoon at the park.", noteLanguage: .en))
+
+            saveRoutine(RoutineDoc(id: UUID(), body: """
+            # Sign Language
+
+            Signs we use every day:
+
+            - **More** — tap fingertips together
+            - **All done** — twist hands outward
+            - **Eat** — fingertips to mouth
+            - **Help** — fist on flat palm, lift up
+            """, updatedAt: .now, sourceLanguage: .en))
+
+            saveRoutine(RoutineDoc(id: UUID(), body: """
+            # Likes
+
+            - Splashing in water
+            - Trampolines
+            - The number 7 bus
+            - Soft blankets
+            """, updatedAt: .now, sourceLanguage: .en))
+
+            saveRoutine(RoutineDoc(id: UUID(), body: """
+            # Dislikes
+
+            - Loud hand dryers
+            - Sudden changes in plan
+            - Scratchy clothing labels
+            """, updatedAt: .now, sourceLanguage: .en))
         }
-        add(LogEntry(kind: .wake, timestamp: at(7, 30)))
-        add(LogEntry(kind: .meal, timestamp: at(8, 0), amount: .normal, note: "Oatmeal and banana", noteLanguage: .en))
-        add(LogEntry(kind: .urine, timestamp: at(9, 10)))
-        add(LogEntry(kind: .mood, timestamp: at(9, 30), moods: [.happy, .energetic]))
-        add(LogEntry(kind: .nap, timestamp: at(12, 30), endTimestamp: at(13, 15)))
-        add(LogEntry(kind: .meal, timestamp: at(15, 0), amount: .little, note: "Apple slices", noteLanguage: .en))
-        add(LogEntry(kind: .note, timestamp: at(16, 20), note: "Great afternoon at the park.", noteLanguage: .en))
-
-        saveRoutine(RoutineDoc(id: UUID(), body: """
-        # Sign Language
-
-        Signs we use every day:
-
-        - **More** — tap fingertips together
-        - **All done** — twist hands outward
-        - **Eat** — fingertips to mouth
-        - **Help** — fist on flat palm, lift up
-        """, updatedAt: .now, sourceLanguage: .en))
-
-        saveRoutine(RoutineDoc(id: UUID(), body: """
-        # Likes
-
-        - Splashing in water
-        - Trampolines
-        - The number 7 bus
-        - Soft blankets
-        """, updatedAt: .now, sourceLanguage: .en))
-
-        saveRoutine(RoutineDoc(id: UUID(), body: """
-        # Dislikes
-
-        - Loud hand dryers
-        - Sudden changes in plan
-        - Scratchy clothing labels
-        """, updatedAt: .now, sourceLanguage: .en))
-        reloadAll()
     }
 }
 #endif
@@ -491,30 +379,7 @@ extension JSONEncoder {
 extension JSONDecoder {
     static var eriksDay: JSONDecoder {
         let d = JSONDecoder()
-        // Accept ISO8601 with or without fractional seconds: the app's own
-        // encoder writes whole seconds, but the offline translation process
-        // emits millisecond timestamps. The plain `.iso8601` strategy rejects
-        // fractional seconds on iOS 17's Foundation, which would silently fail
-        // the whole sidecar decode and drop the translations.
-        d.dateDecodingStrategy = .custom { decoder in
-            let s = try decoder.singleValueContainer().decode(String.self)
-            if let date = ISO8601.withFractional.date(from: s)
-                ?? ISO8601.plain.date(from: s) {
-                return date
-            }
-            throw DecodingError.dataCorrupted(.init(
-                codingPath: decoder.codingPath,
-                debugDescription: "Invalid ISO8601 date: \(s)"))
-        }
+        d.dateDecodingStrategy = .iso8601
         return d
     }
-}
-
-private enum ISO8601 {
-    static let withFractional: ISO8601DateFormatter = {
-        let f = ISO8601DateFormatter()
-        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return f
-    }()
-    static let plain = ISO8601DateFormatter()
 }

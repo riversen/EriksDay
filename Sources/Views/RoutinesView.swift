@@ -264,7 +264,7 @@ private struct RoutineEditorView: View {
         Task {
             let ext = item.supportedContentTypes.first?.preferredFilenameExtension ?? fallbackExt
             if let data = try? await item.loadTransferable(type: Data.self),
-               let rel = store.saveMedia(data, ext: ext) {
+               let rel = await store.saveMedia(data, ext: ext) {
                 controller.insert("\n![](\(rel))\n")
             }
             clear()
@@ -488,7 +488,7 @@ private struct MediaView: View {
     }
 
     private func load() async {
-        guard image == nil, videoURL == nil, let data = store.mediaData(path) else { return }
+        guard image == nil, videoURL == nil, let data = await store.mediaData(path) else { return }
         if isVideo {
             let tmp = FileManager.default.temporaryDirectory
                 .appendingPathComponent((path as NSString).lastPathComponent)
