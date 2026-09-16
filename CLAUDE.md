@@ -58,9 +58,11 @@ routines/media/<uuid>.<ext>      copied photos/videos referenced by markdown
 
 Free text (entry notes, routine bodies) records the language it was written
 in and carries a `translations` map an offline process can fill; the UI falls
-back to the closest available language. A routine loaded while its sidecar
-couldn't be read is marked `metaLoaded: false`, and saving it merges into the
-sidecar instead of replacing it — an audit log and offline translations are
+back to the closest available language. Sidecar fields are decoded one by
+one, so an unknown language or malformed date costs only that field; a routine
+whose sidecar didn't fully decode is marked `metaLoaded: false`, and saving it
+merges into the sidecar and writes back the raw JSON of anything it couldn't
+parse, rather than replacing it — an audit log and offline translations are
 not reproducible.
 
 Two devices editing the same entry within one iCloud sync window still resolve

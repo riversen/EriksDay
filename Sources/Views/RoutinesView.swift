@@ -172,15 +172,16 @@ private struct RoutineEditorView: View {
 
     private let doc: RoutineDoc
     private let uiLanguage: Language
-    /// What the editor opened with. `doc` is re-supplied while the sheet is up,
-    /// so comparing against it could read an untouched text as an edit.
-    private let seededBody: String
+    /// What the editor opened with. `doc` is re-supplied while the sheet is up
+    /// — a translation arriving mid-edit would otherwise read as the user
+    /// having rewritten the body — so this has to survive re-init like `text`.
+    @State private var seededBody: String
     private enum Mode { case edit, preview }
 
     init(doc: RoutineDoc, uiLanguage: Language) {
         self.doc = doc
         self.uiLanguage = uiLanguage
-        self.seededBody = doc.resolvedBody(for: uiLanguage)
+        _seededBody = State(initialValue: doc.resolvedBody(for: uiLanguage))
         _text = State(initialValue: doc.resolvedBody(for: uiLanguage))
     }
 

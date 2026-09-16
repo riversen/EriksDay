@@ -68,6 +68,10 @@ final class FolderStore: ObservableObject {
 
     var hasFolder: Bool { folderURL != nil }
 
+    /// True until the saved folder has been resolved, so the first frame isn't
+    /// a "choose a folder" prompt for someone who chose one long ago.
+    @Published private(set) var isRestoring = false
+
     private static func resolveDeviceName() -> String {
         let key = "deviceName"
         if let saved = UserDefaults.standard.string(forKey: key) { return saved }
@@ -117,12 +121,25 @@ final class FolderStore: ObservableObject {
         }
     }
 
+    /// Resolving a security-scoped bookmark can touch the file system, and for
+    /// an iCloud folder that can take seconds — on the main thread at launch
+    /// that is a watchdog kill. Resolve it off the main actor and attach when
+    /// it comes back.
     private func restoreFolder() {
         guard let data = UserDefaults.standard.data(forKey: bookmarkKey) else { return }
-        var stale = false
-        do {
-            let url = try URL(resolvingBookmarkData: data, options: [],
-                              relativeTo: nil, bookmarkDataIsStale: &stale)
+        isRestoring = true
+        Task {
+            let resolved = await Task.detached(priority: .userInitiated) {
+                var stale = false
+                let url = try? URL(resolvingBookmarkData: data, options: [],
+                                   relativeTo: nil, bookmarkDataIsStale: &stale)
+                return url.map { ($0, stale) }
+            }.value
+            isRestoring = false
+            guard let (url, stale) = resolved else {
+                unlinkFolder()
+                return
+            }
             if stale {
                 setFolder(url)
                 if io == nil { unlinkFolder() }      // couldn't re-save the bookmark
@@ -130,8 +147,6 @@ final class FolderStore: ObservableObject {
                 attach(url, name: url.lastPathComponent)
                 reloadAll()
             }
-        } catch {
-            unlinkFolder()
         }
     }
 

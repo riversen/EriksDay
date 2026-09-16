@@ -85,6 +85,10 @@ struct RoutineMeta: Codable {
     var edits: [EditRecord]
     var sourceLanguage: Language?
     var translations: [String: String]
+    /// Fields that were present but couldn't be decoded. Their content is
+    /// unknown, not empty — writing the sidecar back must carry them over
+    /// verbatim rather than replace them with what this build could parse.
+    var undecodedKeys: Set<String> = []
 
     init(edits: [EditRecord] = [], sourceLanguage: Language? = nil, translations: [String: String] = [:]) {
         self.edits = edits
@@ -94,13 +98,18 @@ struct RoutineMeta: Codable {
 
     private enum CodingKeys: String, CodingKey { case edits, sourceLanguage, translations }
 
-    /// Every field is optional and decoded on its own: one unknown language or
-    /// malformed date must not throw away the whole sidecar — the audit log
-    /// and translations in it are not reproducible.
+    /// Every field is decoded on its own, so one unknown language or malformed
+    /// date costs only that field: an audit log and offline translations can't
+    /// be reproduced. What failed is recorded rather than silently emptied.
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        edits = (try? c.decodeIfPresent([EditRecord].self, forKey: .edits)) as? [EditRecord] ?? []
-        sourceLanguage = (try? c.decodeIfPresent(Language.self, forKey: .sourceLanguage)) ?? nil
-        translations = (try? c.decodeIfPresent([String: String].self, forKey: .translations)) as? [String: String] ?? [:]
+        var failed: Set<String> = []
+        do { edits = try c.decodeIfPresent([EditRecord].self, forKey: .edits) ?? [] }
+        catch { edits = []; failed.insert(CodingKeys.edits.rawValue) }
+        do { sourceLanguage = try c.decodeIfPresent(Language.self, forKey: .sourceLanguage) }
+        catch { sourceLanguage = nil; failed.insert(CodingKeys.sourceLanguage.rawValue) }
+        do { translations = try c.decodeIfPresent([String: String].self, forKey: .translations) ?? [:] }
+        catch { translations = [:]; failed.insert(CodingKeys.translations.rawValue) }
+        undecodedKeys = failed
     }
 }

@@ -14,6 +14,8 @@ struct ContentView: View {
         Group {
             if store.hasFolder {
                 tabs
+            } else if store.isRestoring {
+                ProgressView().controlSize(.large)
             } else {
                 NavigationStack {
                     folderPrompt

@@ -395,7 +395,7 @@ actor FolderIO {
                     // instead of caching the routine as untranslated — and the
                     // doc records that its metadata is unknown, so a save
                     // merges into the sidecar instead of replacing it.
-                    let trusted = meta != nil || metaStamp == nil
+                    let trusted = meta?.undecodedKeys.isEmpty ?? (metaStamp == nil)
                     if !trusted { Self.logger.error("routine \(name, privacy: .public): sidecar unreadable") }
                     let doc = RoutineDoc(id: id,
                                          body: String(data: data, encoding: .utf8) ?? "",
@@ -526,11 +526,12 @@ actor FolderIO {
         }
         guard listed else { return nil }
         guard copies.count > 1 else { return [] }
-        // One copy unreadable (not downloaded yet, say): nothing can be judged.
-        // Leave every copy alone and visible — an entry that silently vanishes
-        // from a care log invites logging the same care twice — and try again
-        // on the next refresh.
-        guard copies.allSatisfy({ $0.entry != nil }) else { return nil }
+        // One copy unreadable (not downloaded yet, say): nothing can be judged,
+        // so hide nothing and try again next refresh. A hide only ever names
+        // the weeks a losing copy stayed in, so the keeper is always shown —
+        // an entry that silently vanishes from a care log invites logging the
+        // same care twice.
+        guard copies.allSatisfy({ $0.entry != nil }) else { return [] }
         func rank(_ c: (key: String, url: URL, entry: LogEntry?)) -> (Date, Int, String) {
             guard let entry = c.entry else { return (.distantPast, 0, "") }
             return (entry.edits.last?.date ?? .distantPast,
@@ -624,6 +625,7 @@ actor FolderIO {
             // can never see a new body paired with the previous body's
             // translations (an old body with cleared translations is merely
             // untranslated, never wrong).
+            var carryOver: Set<String> = []
             var meta = RoutineMeta(edits: doc.edits,
                                    sourceLanguage: doc.sourceLanguage,
                                    translations: doc.translations)
@@ -642,11 +644,23 @@ actor FolderIO {
                 if (try? String(contentsOf: mdURL, encoding: .utf8)) == doc.body {
                     meta.translations = prev.translations
                 }
+                carryOver = prev.undecodedKeys
+            }
+            var metaData: Data
+            do { metaData = try JSONEncoder.eriksDay.encode(meta) }
+            catch let encodeError {
+                error = "Write failed: \(encodeError.localizedDescription)"
+                return
+            }
+            if let previousMeta, !carryOver.isEmpty,
+               let preserved = Self.carryingOver(carryOver, from: previousMeta,
+                                                 into: metaData, adding: doc.edits) {
+                metaData = preserved
             }
             NSFileCoordinator().coordinate(writingItemAt: metaURL, options: .forReplacing,
                                            error: &coordError) { url in
                 do {
-                    try JSONEncoder.eriksDay.encode(meta).write(to: url, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+                    try metaData.write(to: url, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
                 } catch let writeError {
                     error = "Write failed: \(writeError.localizedDescription)"
                 }
@@ -730,6 +744,30 @@ actor FolderIO {
     }
 
     // MARK: - Helpers (folder access already held)
+
+    /// Put back the sidecar fields this build couldn't parse, exactly as they
+    /// were on disk, so writing the file never turns "couldn't read this" into
+    /// "this was empty". An unreadable audit log still gains this save's own
+    /// record, appended to the raw array.
+    private static func carryingOver(_ keys: Set<String>, from previous: Data,
+                                     into encoded: Data, adding newEdits: [EditRecord]) -> Data? {
+        guard var out = (try? JSONSerialization.jsonObject(with: encoded)) as? [String: Any],
+              let old = (try? JSONSerialization.jsonObject(with: previous)) as? [String: Any]
+        else { return nil }
+        for key in keys {
+            guard let raw = old[key] else { out.removeValue(forKey: key); continue }
+            if key == "edits", var records = raw as? [Any] {
+                if let added = try? JSONEncoder.eriksDay.encode(newEdits),
+                   let list = (try? JSONSerialization.jsonObject(with: added)) as? [Any] {
+                    records.append(contentsOf: list)
+                }
+                out[key] = records
+            } else {
+                out[key] = raw
+            }
+        }
+        return try? JSONSerialization.data(withJSONObject: out, options: [.prettyPrinted, .sortedKeys])
+    }
 
     /// Create a folder inside the shared folder one level at a time, never
     /// with intermediates: if the shared folder vanished after the caller's
