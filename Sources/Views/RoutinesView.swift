@@ -168,14 +168,19 @@ private struct RoutineEditorView: View {
     @State private var showLink = false
     @State private var linkLabel = ""
     @State private var linkURLString = ""
+    @State private var mediaError: String?
 
     private let doc: RoutineDoc
     private let uiLanguage: Language
+    /// What the editor opened with. `doc` is re-supplied while the sheet is up,
+    /// so comparing against it could read an untouched text as an edit.
+    private let seededBody: String
     private enum Mode { case edit, preview }
 
     init(doc: RoutineDoc, uiLanguage: Language) {
         self.doc = doc
         self.uiLanguage = uiLanguage
+        self.seededBody = doc.resolvedBody(for: uiLanguage)
         _text = State(initialValue: doc.resolvedBody(for: uiLanguage))
     }
 
@@ -218,6 +223,12 @@ private struct RoutineEditorView: View {
             ToolbarItem(placement: .confirmationAction) {
                 Button(s.save) { save() }
             }
+        }
+        .alert(s.errorTitle,
+               isPresented: Binding(get: { mediaError != nil }, set: { if !$0 { mediaError = nil } })) {
+            Button(s.ok, role: .cancel) { }
+        } message: {
+            Text(mediaError ?? "")
         }
         .onChange(of: photoItem) { _, item in handleMedia(item, fallbackExt: "jpg") { photoItem = nil } }
         .onChange(of: videoItem) { _, item in handleMedia(item, fallbackExt: "mov") { videoItem = nil } }
@@ -263,9 +274,17 @@ private struct RoutineEditorView: View {
         guard let item else { return }
         Task {
             let ext = item.supportedContentTypes.first?.preferredFilenameExtension ?? fallbackExt
-            if let data = try? await item.loadTransferable(type: Data.self),
-               let rel = await store.saveMedia(data, ext: ext) {
-                controller.insert("\n![](\(rel))\n")
+            // Shown here, not via store.lastError: the root alert would
+            // dismiss this sheet and discard the text being edited.
+            if let data = try? await item.loadTransferable(type: Data.self) {
+                let result = await store.saveMedia(data, ext: ext)
+                if let rel = result.value {
+                    controller.insert("\n![](\(rel))\n")
+                } else {
+                    mediaError = result.error ?? "Couldn't save the attachment."
+                }
+            } else {
+                mediaError = "Couldn't load the photo or video."
             }
             clear()
         }
@@ -283,7 +302,7 @@ private struct RoutineEditorView: View {
         var updated = doc
         // Editing what you see re-authors the doc in your language and clears
         // now-stale translations (the offline process regenerates them).
-        if text != doc.resolvedBody(for: uiLanguage) {
+        if text != seededBody {
             updated.body = text
             updated.sourceLanguage = uiLanguage
             updated.translations = [:]
