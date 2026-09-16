@@ -104,6 +104,25 @@ Set the signing team in Xcode (Signing & Capabilities, automatic), or set
 capability is needed: folder access comes from the user's pick, not an
 entitlement.
 
+To build for the App Store:
+
+```
+xcodebuild archive -project EriksDay.xcodeproj -scheme EriksDay \
+  -configuration Release -destination 'generic/platform=iOS' \
+  -archivePath build/EriksDay.xcarchive -allowProvisioningUpdates
+env PATH=/usr/bin:/bin:/usr/sbin:/sbin \
+  xcodebuild -exportArchive -archivePath build/EriksDay.xcarchive \
+  -exportOptionsPlist ExportOptions.plist -exportPath build/ipa \
+  -allowProvisioningUpdates
+```
+
+The `PATH` override is required on this machine. Xcode packages the `.ipa`
+with `/usr/bin/rsync` (Apple's openrsync) passing `--extended-attributes`, but
+openrsync forks a helper found on `PATH`, and the rsync 3.4.4 in
+`/usr/local/bin` rejects that flag. Without the override the export dies with
+a bare `error: exportArchive Copy failed`; the real message is in the
+`.xcdistributionlogs` bundle named in the output.
+
 ## Roadmap
 
 Done: entry detail sheet, history by day, routines (markdown docs with inline
