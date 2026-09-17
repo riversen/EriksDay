@@ -165,6 +165,25 @@ actor FolderIO {
         writeCache("week-\(key).plist", onDisk)
     }
     func loadCachedRoutines() -> RoutineSnapshot? { readCache("routines.plist", as: RoutineSnapshot.self) }
+
+    /// Which days have at least one entry, per week, read from the local cache
+    /// alone. The day browser marks days from this, so a week it hasn't loaded
+    /// still shows its dots. Decoding only, no shared-folder access.
+    func cachedDayIndex() -> [String: Set<Date>] {
+        guard isActive, let dir = cacheDir else { return [:] }
+        let cal = Calendar.current
+        var out: [String: Set<Date>] = [:]
+        for url in (try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)) ?? [] {
+            let name = url.lastPathComponent
+            guard name.hasPrefix("week-"), name.hasSuffix(".plist") else { continue }
+            let key = String(name.dropFirst("week-".count).dropLast(".plist".count))
+            guard let data = try? Data(contentsOf: url),
+                  let snapshot = try? PropertyListDecoder().decode(WeekSnapshot.self, from: data)
+            else { continue }
+            out[key] = Set(snapshot.entries.values.flatMap { $0.spannedDays(cal) })
+        }
+        return out
+    }
     func saveCachedRoutines(_ snapshot: RoutineSnapshot) { writeCache("routines.plist", snapshot) }
 
     /// Only the attached folder's data, at the current cache version, may live

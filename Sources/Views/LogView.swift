@@ -7,6 +7,10 @@ struct LogView: View {
     @State private var editing: EditTarget?
     @State private var newEntry: LogEntry?
     @State private var selectedDay: Date = Calendar.current.startOfDay(for: .now)
+    /// The day the app was last brought to the front. Coming back on a later
+    /// day should open on that day, not on whatever was last being browsed.
+    @State private var lastActiveDay: Date = Calendar.current.startOfDay(for: .now)
+    @Environment(\.scenePhase) private var scenePhase
 
     private var s: Strings { language.s }
 
@@ -22,11 +26,6 @@ struct LogView: View {
         store.entries
             .filter { $0.occupies(selectedDay, cal) }
             .sorted { $0.sortTime(on: selectedDay, cal) > $1.sortTime(on: selectedDay, cal) }
-    }
-
-    /// Days that have at least one entry, for the strip's dots.
-    private var daysWithEntries: Set<Date> {
-        Set(store.entries.flatMap { $0.spannedDays(cal) })
     }
 
     /// A continuous run of days ending today, reaching back far enough to cover
@@ -76,7 +75,8 @@ struct LogView: View {
             }
 
             Section {
-                DayStrip(days: days, daysWithEntries: daysWithEntries, selected: $selectedDay)
+                DayStrip(days: days, daysWithEntries: store.daysWithEntries,
+                         locale: language.current.locale, selected: $selectedDay)
                     .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
                     .listRowBackground(Color.clear)
             }
@@ -102,6 +102,13 @@ struct LogView: View {
         }
         .onAppear { store.ensureLoaded(weekOf: selectedDay) }
         .onChange(of: selectedDay) { _, day in store.ensureLoaded(weekOf: day) }
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .active else { return }
+            let today = cal.startOfDay(for: .now)
+            guard today != lastActiveDay else { return }
+            lastActiveDay = today
+            selectedDay = today
+        }
         .sheet(item: $editing) { target in
             NavigationStack {
                 EntryEditor(entry: target.entry, isNew: false, uiLanguage: language.current,
@@ -163,44 +170,106 @@ private struct EditTarget: Identifiable {
 private struct DayStrip: View {
     let days: [Date]
     let daysWithEntries: Set<Date>
+    let locale: Locale
     @Binding var selected: Date
 
     private let cal = Calendar.current
 
+    /// The first day shown in each month, so the strip says where months begin
+    /// rather than running together as a line of bare numbers.
+    private var monthStarts: Set<Date> {
+        var starts: Set<Date> = []
+        var previous: DateComponents?
+        for day in days {
+            let month = cal.dateComponents([.year, .month], from: day)
+            if month != previous { starts.insert(day) }
+            previous = month
+        }
+        return starts
+    }
+
     var body: some View {
-        ScrollViewReader { proxy in
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(days, id: \.self) { day in
-                        DayCell(day: day,
-                                selected: cal.isDate(day, inSameDayAs: selected),
-                                hasEntries: daysWithEntries.contains(cal.startOfDay(for: day)))
-                            .id(day)
-                            .onTapGesture { selected = day }
-                    }
-                }
+        VStack(alignment: .leading, spacing: 4) {
+            Text(selected.formatted(.dateTime.month(.wide).year().locale(locale)))
+                .font(.caption)
+                .fontWeight(.semibold)
+                .foregroundStyle(.secondary)
                 .padding(.horizontal, 16)
-                .padding(.vertical, 4)
+
+            ScrollViewReader { proxy in
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(days, id: \.self) { day in
+                            if monthStarts.contains(day) {
+                                MonthMarker(day: day, locale: locale)
+                            }
+                            DayCell(day: day,
+                                    locale: locale,
+                                    selected: cal.isDate(day, inSameDayAs: selected),
+                                    hasEntries: daysWithEntries.contains(cal.startOfDay(for: day)))
+                                .id(day)
+                                .onTapGesture { selected = day }
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 4)
+                }
+                .onAppear { show(selected, in: proxy, animated: false) }
+                // The run of days grows when the folder listing arrives. Without
+                // this the strip stays where it was, which is the oldest day,
+                // leaving the day actually being shown off-screen.
+                .onChange(of: days) { _, _ in show(selected, in: proxy, animated: false) }
+                .onChange(of: selected) { _, day in show(day, in: proxy, animated: true) }
             }
-            .onAppear { proxy.scrollTo(selected, anchor: .trailing) }
-            .onChange(of: selected) { _, day in
+        }
+    }
+
+    private func show(_ day: Date, in proxy: ScrollViewProxy, animated: Bool) {
+        // After this layout pass: the cell may not exist yet on first appearance
+        // or immediately after the run of days changed.
+        DispatchQueue.main.async {
+            if animated {
                 withAnimation { proxy.scrollTo(day, anchor: .center) }
+            } else {
+                proxy.scrollTo(day, anchor: .center)
             }
         }
     }
 }
 
+private struct MonthMarker: View {
+    let day: Date
+    let locale: Locale
+
+    var body: some View {
+        // Formatted here rather than with `Text(_:format:)`: SwiftUI resolves
+        // that against the environment's locale, which is the device's, not the
+        // language the user picked in the app.
+        Text(day.formatted(.dateTime.month(.abbreviated).locale(locale)))
+            .font(.caption2)
+            .fontWeight(.semibold)
+            .foregroundStyle(.secondary)
+            .textCase(.uppercase)
+            .lineLimit(1)
+            .minimumScaleFactor(0.7)
+            .frame(width: 34, height: 64)
+    }
+}
+
 private struct DayCell: View {
     let day: Date
+    let locale: Locale
     let selected: Bool
     let hasEntries: Bool
 
     var body: some View {
         VStack(spacing: 3) {
-            Text(day, format: .dateTime.weekday(.abbreviated))
+            Text(day.formatted(.dateTime.weekday(.abbreviated).locale(locale)))
                 .font(.caption2)
                 .textCase(.uppercase)
-            Text(day, format: .dateTime.day())
+            // The bare number: a localised day is ordinal in Norwegian ("11."),
+            // which reads as a stray full stop in a calendar cell.
+            Text(String(Calendar.current.component(.day, from: day)))
                 .font(.headline)
             Circle()
                 .frame(width: 5, height: 5)
@@ -407,8 +476,8 @@ private struct EntryEditor: View {
                         HStack {
                             Text(edit.device).font(.caption)
                             Spacer()
-                            Text(edit.date, format: .dateTime.day().month().hour().minute()
-                                .locale(language.current.locale))
+                            Text(edit.date.formatted(.dateTime.day().month().hour().minute()
+                                .locale(language.current.locale)))
                                 .font(.caption).foregroundStyle(.secondary)
                         }
                     }

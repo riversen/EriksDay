@@ -16,6 +16,12 @@ import os
 @MainActor
 final class FolderStore: ObservableObject {
     @Published private(set) var entries: [LogEntry] = []
+    /// Days that have at least one entry, covering every week the local cache
+    /// knows — not just the weeks loaded into `entries`. The day browser marks
+    /// days from this, so scrolling back doesn't reach a stretch of blank days
+    /// that turn out to have entries once tapped.
+    @Published private(set) var daysWithEntries: Set<Date> = []
+    private var dayIndex: [String: Set<Date>] = [:]
     @Published private(set) var routines: [RoutineDoc] = []
     @Published private(set) var folderName: String?
     @Published var lastError: String? {
@@ -93,6 +99,8 @@ final class FolderStore: ObservableObject {
         weeks = [:]
         loadedWeeks = []
         knownWeeks = []
+        dayIndex = [:]
+        daysWithEntries = []
         routineSnapshot = RoutineSnapshot()
         entries = []                // the previous folder's data leaves the screen now,
         routines = []               // not when the first refresh happens to finish
@@ -223,6 +231,7 @@ final class FolderStore: ObservableObject {
                 loadedWeeks.remove(key)
             }
         }
+        dayIndex = dayIndex.filter { keys.contains($0.key) }   // weeks gone from disk lose their dots
         let targets = loadedWeeks.union(recentWeekKeys()).intersection(keys)
         // …nor in the cache. Cached weeks we won't reconcile are also checked
         // against disk stamps — on the first refresh after attaching and at most
@@ -297,8 +306,13 @@ final class FolderStore: ObservableObject {
             applyRoutines(cached)
             primed += cached.items.count
         }
-        if primed > 0 { rebuildEntries() }
-        Self.logger.notice("primed \(primed) items from cache")
+        // Dots for every cached week, including ones no one has opened yet.
+        // A loaded week keeps its own, which is the fresher of the two.
+        let cachedDays = await io.cachedDayIndex()
+        guard gen == generation else { return }
+        for (key, days) in cachedDays where !loadedWeeks.contains(key) { dayIndex[key] = days }
+        rebuildEntries()
+        Self.logger.notice("primed \(primed) items from cache, \(self.daysWithEntries.count, privacy: .public) days marked")
     }
 
     /// Ensure the week containing `date` is loaded — called as the day browser
@@ -390,6 +404,8 @@ final class FolderStore: ObservableObject {
         }
         weeks[key] = snapshot
         loadedWeeks.insert(key)
+        // A loaded week is authoritative for its own dots.
+        dayIndex[key] = Set(snapshot.entries.values.flatMap { $0.spannedDays(Calendar.current) })
     }
 
     /// Remember, per device, which entries still have a superseded copy in
@@ -436,6 +452,7 @@ final class FolderStore: ObservableObject {
             }
         }
         entries = best.values.map(\.entry).sorted { $0.timestamp > $1.timestamp }
+        daysWithEntries = dayIndex.values.reduce(into: Set<Date>()) { $0.formUnion($1) }
         Self.logger.notice("entries: \(self.entries.count, privacy: .public) rows")
     }
 

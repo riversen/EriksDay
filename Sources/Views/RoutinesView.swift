@@ -103,8 +103,8 @@ private struct RoutineDetailView: View {
                                 Image(systemName: "pencil").font(.caption2)
                                 Text(last.device).font(.caption)
                                 Spacer()
-                                Text(last.date, format: .dateTime.day().month().hour().minute()
-                                    .locale(language.current.locale)).font(.caption)
+                                Text(last.date.formatted(.dateTime.day().month().hour().minute()
+                                    .locale(language.current.locale))).font(.caption)
                             }
                             .foregroundStyle(.secondary)
                         }

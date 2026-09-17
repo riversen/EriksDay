@@ -87,6 +87,11 @@ newest copy. The `storage` os_log category reports
 `primed N`, per-week `reused/read` counts, the `entries: N rows` the UI sees,
 and every `lastError`, for diagnosing it with `log show`.
 
+`FolderStore.daysWithEntries` is built from that cache rather than from the
+weeks loaded into memory, so the day browser can mark days in weeks it has not
+loaded. A week the app has never opened on this device has no cache entry and
+so no dots until it is visited.
+
 The DEBUG-only launch arguments `-demoData` (attach a local seeded folder),
 `-tabRoutines` and `-demoEditRoutine` (save an edit to the routine with the
 lowest id) exist so a shell script can drive storage without the UI.
