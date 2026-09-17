@@ -174,6 +174,10 @@ private struct DayStrip: View {
     @Binding var selected: Date
 
     private let cal = Calendar.current
+    /// The month whose days are currently under the eye, tracked from the
+    /// scroll itself: browsing three months back should not leave the heading
+    /// naming the month of the day that happens to be selected.
+    @State private var scrolledMonth: Date?
 
     /// The first day shown in each month, so the strip says where months begin
     /// rather than running together as a line of bare numbers.
@@ -190,7 +194,7 @@ private struct DayStrip: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(selected.formatted(.dateTime.month(.wide).year().locale(locale)))
+            Text((scrolledMonth ?? selected).formatted(.dateTime.month(.wide).year().locale(locale)))
                 .font(.caption)
                 .fontWeight(.semibold)
                 .foregroundStyle(.secondary)
@@ -202,6 +206,12 @@ private struct DayStrip: View {
                         ForEach(days, id: \.self) { day in
                             if monthStarts.contains(day) {
                                 MonthMarker(day: day, locale: locale)
+                                    .background(GeometryReader { geo in
+                                        Color.clear.preference(
+                                            key: MonthAnchorKey.self,
+                                            value: [MonthAnchor(day: day,
+                                                                x: geo.frame(in: .named("strip")).minX)])
+                                    })
                             }
                             DayCell(day: day,
                                     locale: locale,
@@ -213,6 +223,13 @@ private struct DayStrip: View {
                     }
                     .padding(.horizontal, 16)
                     .padding(.vertical, 4)
+                }
+                .coordinateSpace(name: "strip")
+                .onPreferenceChange(MonthAnchorKey.self) { anchors in
+                    // The last month marker scrolled past the leading edge, or
+                    // the leftmost one still ahead of it.
+                    let behind = anchors.filter { $0.x <= 24 }.max { $0.x < $1.x }
+                    scrolledMonth = (behind ?? anchors.min { $0.x < $1.x })?.day
                 }
                 .onAppear { show(selected, in: proxy, animated: false) }
                 // The run of days grows when the folder listing arrives. Without
@@ -234,6 +251,19 @@ private struct DayStrip: View {
                 proxy.scrollTo(day, anchor: .center)
             }
         }
+    }
+}
+
+/// Where a month's marker sits relative to the strip's leading edge.
+private struct MonthAnchor: Equatable {
+    let day: Date
+    let x: CGFloat
+}
+
+private struct MonthAnchorKey: PreferenceKey {
+    static var defaultValue: [MonthAnchor] = []
+    static func reduce(value: inout [MonthAnchor], nextValue: () -> [MonthAnchor]) {
+        value += nextValue()
     }
 }
 
