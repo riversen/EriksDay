@@ -404,8 +404,7 @@ final class FolderStore: ObservableObject {
         }
         weeks[key] = snapshot
         loadedWeeks.insert(key)
-        // A loaded week is authoritative for its own dots.
-        dayIndex[key] = Set(snapshot.entries.values.flatMap { $0.spannedDays(Calendar.current) })
+        dayIndex[key] = nil     // loaded: rebuildEntries reads it from memory now
     }
 
     /// Remember, per device, which entries still have a superseded copy in
@@ -452,7 +451,15 @@ final class FolderStore: ObservableObject {
             }
         }
         entries = best.values.map(\.entry).sorted { $0.timestamp > $1.timestamp }
-        daysWithEntries = dayIndex.values.reduce(into: Set<Date>()) { $0.formUnion($1) }
+        // Marks come from what is in memory for the weeks that are loaded, so
+        // a just-logged entry lights its day at once, and from the cache for
+        // the weeks that aren't.
+        let cal = Calendar.current
+        var days = Set(best.values.flatMap { $0.entry.spannedDays(cal) })
+        for (key, cached) in dayIndex where !loadedWeeks.contains(key) {
+            days.formUnion(cached)
+        }
+        daysWithEntries = days
         Self.logger.notice("entries: \(self.entries.count, privacy: .public) rows")
     }
 
